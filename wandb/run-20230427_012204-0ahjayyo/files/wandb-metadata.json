@@ -1,0 +1,216 @@
+{
+    "os": "Linux-3.10.0-1160.49.1.el7.x86_64-x86_64-with-glibc2.10",
+    "python": "3.8.5",
+    "heartbeatAt": "2023-04-27T08:22:11.719510",
+    "startedAt": "2023-04-27T08:22:04.159379",
+    "docker": null,
+    "cuda": null,
+    "args": null,
+    "state": "running",
+    "program": "pretrain_MLP.ipynb",
+    "git": {
+        "remote": "https://github.com/evilpegasus/transfer-learning.git",
+        "commit": "e02095a6b83d191cb5982bf0c3a20768b9b26fff"
+    },
+    "email": "mingfong07@hotmail.com",
+    "root": "/global/home/users/mfong/git/transfer-learning",
+    "host": "ml4hep2",
+    "username": "mfong",
+    "executable": "/global/home/users/mfong/anaconda3/bin/python",
+    "cpu_count": 16,
+    "cpu_count_logical": 32,
+    "cpu_freq": {
+        "current": 1.65,
+        "min": 1500.0,
+        "max": 3000.0
+    },
+    "cpu_freq_per_core": [
+        {
+            "current": 1.5,
+            "min": 1500.0,
+            "max": 3000.0
+        },
+        {
+            "current": 1.5,
+            "min": 1500.0,
+            "max": 3000.0
+        },
+        {
+            "current": 1.5,
+            "min": 1500.0,
+            "max": 3000.0
+        },
+        {
+            "current": 1.5,
+            "min": 1500.0,
+            "max": 3000.0
+        },
+        {
+            "current": 1.5,
+            "min": 1500.0,
+            "max": 3000.0
+        },
+        {
+            "current": 1.5,
+            "min": 1500.0,
+            "max": 3000.0
+        },
+        {
+            "current": 1.5,
+            "min": 1500.0,
+            "max": 3000.0
+        },
+        {
+            "current": 1.5,
+            "min": 1500.0,
+            "max": 3000.0
+        },
+        {
+            "current": 1.5,
+            "min": 1500.0,
+            "max": 3000.0
+        },
+        {
+            "current": 1.5,
+            "min": 1500.0,
+            "max": 3000.0
+        },
+        {
+            "current": 3.0,
+            "min": 1500.0,
+            "max": 3000.0
+        },
+        {
+            "current": 1.5,
+            "min": 1500.0,
+            "max": 3000.0
+        },
+        {
+            "current": 2.4,
+            "min": 1500.0,
+            "max": 3000.0
+        },
+        {
+            "current": 1.5,
+            "min": 1500.0,
+            "max": 3000.0
+        },
+        {
+            "current": 1.5,
+            "min": 1500.0,
+            "max": 3000.0
+        },
+        {
+            "current": 1.5,
+            "min": 1500.0,
+            "max": 3000.0
+        },
+        {
+            "current": 1.5,
+            "min": 1500.0,
+            "max": 3000.0
+        },
+        {
+            "current": 3.0,
+            "min": 1500.0,
+            "max": 3000.0
+        },
+        {
+            "current": 1.5,
+            "min": 1500.0,
+            "max": 3000.0
+        },
+        {
+            "current": 1.5,
+            "min": 1500.0,
+            "max": 3000.0
+        },
+        {
+            "current": 1.5,
+            "min": 1500.0,
+            "max": 3000.0
+        },
+        {
+            "current": 1.5,
+            "min": 1500.0,
+            "max": 3000.0
+        },
+        {
+            "current": 1.5,
+            "min": 1500.0,
+            "max": 3000.0
+        },
+        {
+            "current": 1.5,
+            "min": 1500.0,
+            "max": 3000.0
+        },
+        {
+            "current": 1.5,
+            "min": 1500.0,
+            "max": 3000.0
+        },
+        {
+            "current": 1.5,
+            "min": 1500.0,
+            "max": 3000.0
+        },
+        {
+            "current": 1.5,
+            "min": 1500.0,
+            "max": 3000.0
+        },
+        {
+            "current": 1.5,
+            "min": 1500.0,
+            "max": 3000.0
+        },
+        {
+            "current": 1.5,
+            "min": 1500.0,
+            "max": 3000.0
+        },
+        {
+            "current": 1.5,
+            "min": 1500.0,
+            "max": 3000.0
+        },
+        {
+            "current": 2.4,
+            "min": 1500.0,
+            "max": 3000.0
+        },
+        {
+            "current": 1.5,
+            "min": 1500.0,
+            "max": 3000.0
+        }
+    ],
+    "disk": {
+        "total": 96.9096908569336,
+        "used": 55.05217361450195
+    },
+    "gpu": "NVIDIA A40",
+    "gpu_count": 4,
+    "gpu_devices": [
+        {
+            "name": "NVIDIA A40",
+            "memory_total": 47850782720
+        },
+        {
+            "name": "NVIDIA A40",
+            "memory_total": 47850782720
+        },
+        {
+            "name": "NVIDIA A40",
+            "memory_total": 47850782720
+        },
+        {
+            "name": "NVIDIA A40",
+            "memory_total": 47850782720
+        }
+    ],
+    "memory": {
+        "total": 503.66276931762695
+    }
+}
