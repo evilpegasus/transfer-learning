@@ -30,7 +30,9 @@ def preprocess_data(train_filepaths: List[str], target_dir: str, force=False):
 
 
 class H5Dataset(Dataset):
-  """Pytorch Dataset class for h5 files"""
+  """
+  Pytorch Dataset class for h5 files that loads in h5 files one at a time to save memory.
+  """
   def __init__(self, filepaths: List[str], transform=None):
     self.filepaths = filepaths
     self.transform = transform
@@ -53,7 +55,7 @@ class H5Dataset(Dataset):
 
   def __getitem__(self, idx):
     filepath_idx, sample_idx = self.sample_indices[idx]
-    self.load_file(filepath_idx)
+    self._load_h5_to_mem(filepath_idx)
     data = self.loaded_data[sample_idx]
     labels = self.loaded_labels[sample_idx]
     
@@ -68,7 +70,11 @@ class H5Dataset(Dataset):
     labels = np.asarray(labels)
     return data, labels
 
-  def load_file(self, file_idx):
+  def _open_h5_file(self, filepath:str):
+    pass
+
+  # NOTE this is too slow
+  def _load_h5_to_mem(self, file_idx):
     """Loads the data of a single h5 file into memory. If self.loaded_file_idx is already loaded, do nothing"""
     if self.loaded_file_idx == file_idx:
       return
@@ -78,10 +84,16 @@ class H5Dataset(Dataset):
       self.loaded_data = file[self.DATA_KEY][:]
       self.loaded_labels = file[self.LABEL_KEY][:]
     self.loaded_file_idx = file_idx
-    
-  def get_loaded_file(self):
+
+  def _get_loaded_file(self):
     """Returns the name of the h5 files currently loaded into memory"""
     return self.filepaths[self.loaded_file_idx]
+
+
+
+
+
+
 
 if __name__ == "__main__":
   """
@@ -93,7 +105,8 @@ if __name__ == "__main__":
   print("Original data filepath:", sys.argv[1])
   print("Target directory:", sys.argv[2])
   
-  # ml4hep filepaths:
+  # ml4hep filepath args:
   # /global/ml4hep/spss/mfong/transfer_learning/fullsim_test/test.h5
   # /global/ml4hep/spss/mfong/transfer_learning/fullsim_test_processed/
+  # nohup python data_utils.py /global/ml4hep/spss/mfong/transfer_learning/fullsim_train/train.h5 /global/ml4hep/spss/mfong/transfer_learning/fullsim_train_processed/ > data_util_train.out &
   preprocess_data([sys.argv[1]], sys.argv[2])
