@@ -19,6 +19,7 @@ def preprocess_data(train_filepaths: List[str], target_dir: str, force=False):
       print(f"{target_filepath} is already in target_dir, skipping this file")
       continue
     with h5py.File(filepath, 'r') as old_file, h5py.File(target_filepath, "w") as new_file:
+      print("Working on", filepath)
       processed_data = preprocessing.constituent(old_file, 200)
       labels = old_file["labels"]
       print(f"Saving preprocessed data to {target_filepath}")
@@ -81,3 +82,18 @@ class H5Dataset(Dataset):
   def get_loaded_file(self):
     """Returns the name of the h5 files currently loaded into memory"""
     return self.filepaths[self.loaded_file_idx]
+
+if __name__ == "__main__":
+  """
+  If run directly, preprocess the data and save it to the target_dir
+  args[0] = filepath of the original data h5 file
+  args[1] = path of target directory to save preprocessed data to
+  """
+  assert len(sys.argv) == 3, f"wrong number of arguments (should be 2, was {len(sys.argv) - 1})"
+  print("Original data filepath:", sys.argv[1])
+  print("Target directory:", sys.argv[2])
+  
+  # ml4hep filepaths:
+  # /global/ml4hep/spss/mfong/transfer_learning/fullsim_test/test.h5
+  # /global/ml4hep/spss/mfong/transfer_learning/fullsim_test_processed/
+  preprocess_data([sys.argv[1]], sys.argv[2])
