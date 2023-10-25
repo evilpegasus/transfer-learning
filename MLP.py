@@ -46,7 +46,7 @@ config = {
   "test_samples": len(test_dataset),
 }
 wandb_run = wandb.init(
-  project="fullsim_MLP",
+  project="delphes_pretrain",
   name=f"MLP_delphes",
   config=config, reinit=True
 )
