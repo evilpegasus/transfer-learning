@@ -112,10 +112,7 @@ class H5Dataset(Dataset):
   def get_opened_file(self) -> str:
     """Returns the name of the h5 files currently opened"""
     return self.filepaths[self.opened_file_idx]
-    
-    
-    
-    
+
   # NOTE this is too slow
   # def _load_h5_to_mem(self, file_idx):
   #   """Loads the data of a single h5 file into memory. If self.loaded_file_idx is already loaded, do nothing"""
@@ -134,8 +131,66 @@ class H5Dataset(Dataset):
 
 
 
+class H5Dataset2(Dataset):
+  """
+  Version of H5Dataset that opens and closes files for each sample.
+  """
+  def __init__(
+    self,
+    filepaths: List[str],
+    transform=None,
+    preprocessed:bool=True,
+    data_key:str="data",
+    label_key:str="labels",
+    ):
+    """Initialize the dataset object
 
+    Args:
+        filepaths (List[str]): List of full Linux filepaths to h5 files
+        transform (Callable[np.ndarray], optional): Optional function that is applied to all samples. Defaults to None.
+        preprocessed (bool, optional): If the data was already preprocessed set this to True. Defaults to True.
+    """
+    self.filepaths = filepaths
+    self.transform = transform
+    self.preprocessed = preprocessed
+    self.FEATURE_KEYS = ['fjet_clus_eta', 'fjet_clus_phi', 'fjet_clus_pt', 'fjet_clus_E']       # original unprocessed feature keys
+    self.DATA_KEY = data_key
+    self.LABEL_KEY = label_key
+    self.sample_indices = []        # Store a tuple of (filepath_idx, sample_idx) for each sample in the dataset
 
+    for filepath_idx, file_path in enumerate(filepaths):
+      with h5py.File(file_path, "r") as file:
+        num_samples = len(file[self.LABEL_KEY])
+        indices = list(range(num_samples))
+        self.sample_indices.extend([(filepath_idx, idx) for idx in indices])
+
+  def __len__(self):
+    return len(self.sample_indices)
+
+  def __getitem__(self, idx):
+    """Returns a single sample from the dataset. Opens the h5 file containing the sample if it is not already open"""
+    filepath_idx, sample_idx = self.sample_indices[idx]
+    
+    with h5py.File(self.filepaths[filepath_idx], "r") as file:
+      labels = file[self.LABEL_KEY][sample_idx]
+      data = file[self.DATA_KEY][sample_idx]
+    
+    # if self.preprocessed:
+    #   data = self.opened_file[self.DATA_KEY][sample_idx]
+    # else:
+    #   data = preprocessing.constituent({
+    #     "fjet_clus_eta": self.opened_file["fjet_clus_eta"][sample_idx],
+    #     "fjet_clus_phi": self.opened_file["fjet_clus_phi"][sample_idx],
+    #     "fjet_clus_pt": self.opened_file["fjet_clus_pt"][sample_idx],
+    #     "fjet_clus_E": self.opened_file["fjet_clus_E"][sample_idx],
+    #   }, 200)
+
+    # if self.transform:
+    #   data = self.transform(data)
+
+    data = np.asarray(data).flatten()
+    labels = np.asarray(labels)
+    return data, labels
 
 
 
