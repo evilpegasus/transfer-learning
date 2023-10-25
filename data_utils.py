@@ -33,16 +33,30 @@ class H5Dataset(Dataset):
   """
   Pytorch Dataset class for h5 files that loads in h5 files one at a time to save memory.
   """
-  def __init__(self, filepaths: List[str], transform=None):
+  def __init__(
+    self,
+    filepaths: List[str],
+    transform=None,
+    preprocessed:bool=True,
+    data_key:str="data",
+    label_key:str="labels",
+    ):
+    """Initialize the dataset object
+
+    Args:
+        filepaths (List[str]): List of full Linux filepaths to h5 files
+        transform (Callable[np.ndarray], optional): Optional function that is applied to all samples. Defaults to None.
+        preprocessed (bool, optional): If the data was already preprocessed set this to True. Defaults to True.
+    """
     self.filepaths = filepaths
     self.transform = transform
-    self.sample_indices = []  # Store the indices of samples within each file
-    # self.FEATURE_KEYS = ['fjet_clus_eta', 'fjet_clus_phi', 'fjet_clus_pt', 'fjet_clus_E']
-    self.DATA_KEY = "data"
-    self.LABEL_KEY = "labels"
-    self.loaded_file_idx = None     # self.filepaths index that is currently loaded into memory
-    self.loaded_data = None
-    self.loaded_labels = None
+    self.preprocessed = preprocessed
+    self.FEATURE_KEYS = ['fjet_clus_eta', 'fjet_clus_phi', 'fjet_clus_pt', 'fjet_clus_E']       # original unprocessed feature keys
+    self.DATA_KEY = data_key
+    self.LABEL_KEY = label_key
+    self.sample_indices = []        # Store the indices of samples within each file
+    self.opened_file_idx = None     # self.filepaths index that is opened
+    self.opened_file = None         # h5 file that is opened
 
     for filepath_idx, file_path in enumerate(filepaths):
       with h5py.File(file_path, "r") as file:
@@ -54,40 +68,70 @@ class H5Dataset(Dataset):
     return len(self.sample_indices)
 
   def __getitem__(self, idx):
+    """Returns a single sample from the dataset. Opens the h5 file containing the sample if it is not already open"""
     filepath_idx, sample_idx = self.sample_indices[idx]
-    self._load_h5_to_mem(filepath_idx)
-    data = self.loaded_data[sample_idx]
-    labels = self.loaded_labels[sample_idx]
+    self._open_h5_file(filepath_idx)
     
-    # filepath = self.filepaths[filepath_idx]
-    # with h5py.File(filepath, 'r') as file:
-    #   data = file[self.DATA_KEY][sample_idx]  # Load a single sample
-    #   labels = file[self.LABEL_KEY][sample_idx]
+    labels = self.opened_file[self.LABEL_KEY][sample_idx]
+    
+    if self.preprocessed:
+      data = self.opened_file[self.DATA_KEY][sample_idx]
+    else:
+      data = preprocessing.constituent({
+        "fjet_clus_eta": self.opened_file["fjet_clus_eta"][sample_idx],
+        "fjet_clus_phi": self.opened_file["fjet_clus_phi"][sample_idx],
+        "fjet_clus_pt": self.opened_file["fjet_clus_pt"][sample_idx],
+        "fjet_clus_E": self.opened_file["fjet_clus_E"][sample_idx],
+      }, 200)
 
     # if self.transform:
     #   data = self.transform(data)
+
     data = np.asarray(data).flatten()
     labels = np.asarray(labels)
     return data, labels
 
-  def _open_h5_file(self, filepath:str):
-    pass
-
-  # NOTE this is too slow
-  def _load_h5_to_mem(self, file_idx):
-    """Loads the data of a single h5 file into memory. If self.loaded_file_idx is already loaded, do nothing"""
-    if self.loaded_file_idx == file_idx:
+  def _open_h5_file(self, filepath_idx: int):
+    """Opens the h5 file at self.filepaths[filepath_idx]. If another file was open, close it. If the file is already open, do nothing"""
+    if self.opened_file_idx == filepath_idx:
       return
-    print("loading file", self.filepaths[file_idx])
-    filepath = self.filepaths[file_idx]
-    with h5py.File(filepath, "r") as file:
-      self.loaded_data = file[self.DATA_KEY][:]
-      self.loaded_labels = file[self.LABEL_KEY][:]
-    self.loaded_file_idx = file_idx
+    if self.opened_file_idx is not None:
+      self._close_h5_file()
+    filepath = self.filepaths[filepath_idx]
+    self.opened_file = h5py.File(filepath, "r")
+    self.opened_file_idx = filepath_idx
+    
+  def _close_h5_file(self):
+    """Closes the currently opened h5 file. If no file is open, do nothing"""
+    if self.opened_file_idx is None:
+      return
+    self.opened_file.close()
+    self.opened_file_idx = None
+    self.opened_file = None
+  
+  def get_opened_file(self) -> str:
+    """Returns the name of the h5 files currently opened"""
+    return self.filepaths[self.opened_file_idx]
+    
+    
+    
+    
+  # NOTE this is too slow
+  # def _load_h5_to_mem(self, file_idx):
+  #   """Loads the data of a single h5 file into memory. If self.loaded_file_idx is already loaded, do nothing"""
+  #   if self.loaded_file_idx == file_idx:
+  #     return
+  #   print("loading file", self.filepaths[file_idx])
+  #   filepath = self.filepaths[file_idx]
+  #   with h5py.File(filepath, "r") as file:
+  #     self.loaded_data = file[self.DATA_KEY][:]
+  #     self.loaded_labels = file[self.LABEL_KEY][:]
+  #   self.loaded_file_idx = file_idx
 
-  def _get_loaded_file(self):
-    """Returns the name of the h5 files currently loaded into memory"""
-    return self.filepaths[self.loaded_file_idx]
+  # def _get_loaded_file(self):
+  #   """Returns the name of the h5 files currently loaded into memory"""
+  #   return self.filepaths[self.loaded_file_idx]
+
 
 
 
