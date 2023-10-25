@@ -54,7 +54,7 @@ class H5Dataset(Dataset):
     self.FEATURE_KEYS = ['fjet_clus_eta', 'fjet_clus_phi', 'fjet_clus_pt', 'fjet_clus_E']       # original unprocessed feature keys
     self.DATA_KEY = data_key
     self.LABEL_KEY = label_key
-    self.sample_indices = []        # Store the indices of samples within each file
+    self.sample_indices = []        # Store a tuple of (filepath_idx, sample_idx) for each sample in the dataset
     self.opened_file_idx = None     # self.filepaths index that is opened
     self.opened_file = None         # h5 file that is opened
 
