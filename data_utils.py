@@ -6,9 +6,13 @@ from torch.utils.data import Dataset, DataLoader
 import numpy as np
 import preprocessing
 from tqdm import tqdm
+from pathlib import Path
 
 def preprocess_data(train_filepaths: List[str], target_dir: str, force=False):
   """Preprocesses h5 data from train_filepaths using the preprocess.py script and stores it as h5 files in target_dir. Use absolute paths"""
+  # make the path if it got purged from pscratch
+  Path(target_dir).mkdir(parents=True, exist_ok=True)
+
   target_dir_filepaths = [target_dir + x for x in os.listdir(target_dir)]
   for filepath in tqdm(train_filepaths):
     filename = filepath.split("/")[-1]
@@ -208,4 +212,7 @@ if __name__ == "__main__":
   # /global/ml4hep/spss/mfong/transfer_learning/fullsim_test/test.h5
   # /global/ml4hep/spss/mfong/transfer_learning/fullsim_test_processed/
   # nohup python data_utils.py /global/ml4hep/spss/mfong/transfer_learning/fullsim_train/train.h5 /global/ml4hep/spss/mfong/transfer_learning/fullsim_train_processed/ > data_util_train.out &
+  
+  # nersc commond
+  # nohup python3 data_utils.py /global/cfs/projectdirs/m3246/mingfong/transfer-learning/delphes_train_set/train_0.h5 /pscratch/sd/m/mingfong/transfer-learning/delphes_train_processed/ > data_util_train_0.out &
   preprocess_data([sys.argv[1]], sys.argv[2])
