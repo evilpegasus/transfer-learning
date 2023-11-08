@@ -1,6 +1,6 @@
 import sys
 import os
-os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+# os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 os.environ["KERAS_BACKEND"] = "jax"
 
 from typing import List
@@ -15,7 +15,7 @@ from keras_core import ops
 import matplotlib.pyplot as plt
 
 import wandb
-from wandb.keras import WandbCallback, WandbMetricsLogger
+from wandb.keras import WandbMetricsLogger, WandbModelCheckpoint
 
 from data_utils import preprocess_data, H5Dataset, H5Dataset2
 
@@ -65,7 +65,10 @@ train_history = model.fit(
   validation_data=test_dataloader,
   batch_size=config["batch_size"],
   epochs=config["epochs"],
-  callbacks=[WandbMetricsLogger(log_freq="batch")],
+  callbacks=[
+    WandbMetricsLogger(log_freq="batch"),
+    WandbModelCheckpoint("models", save_freq="epoch"),
+  ],
 )
 
 wandb.finish()
