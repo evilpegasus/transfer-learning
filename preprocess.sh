@@ -19,7 +19,7 @@ conda activate jax
 #run the application:
 # srun -n 1 -c 256 --cpu_bind=cores python3 /global/homes/m/mingfong/git/transfer-learning/data_utils.py
 
-# train dataset
+# fastsim train dataset
 # srun --exclusive -n 1 -c 32 --cpu_bind=cores python3 data_utils.py /global/cfs/projectdirs/m3246/mingfong/transfer-learning/delphes_train_set/train_0.h5 /pscratch/sd/m/mingfong/transfer-learning/delphes_train_processed/ &
 # srun --exclusive -n 1 -c 32 --cpu_bind=cores python3 data_utils.py /global/cfs/projectdirs/m3246/mingfong/transfer-learning/delphes_train_set/train_1.h5 /pscratch/sd/m/mingfong/transfer-learning/delphes_train_processed/ &
 # srun --exclusive -n 1 -c 32 --cpu_bind=cores python3 data_utils.py /global/cfs/projectdirs/m3246/mingfong/transfer-learning/delphes_train_set/train_2.h5 /pscratch/sd/m/mingfong/transfer-learning/delphes_train_processed/ &
@@ -37,8 +37,14 @@ conda activate jax
 # srun --exclusive -n 1 -c 32 --cpu_bind=cores python3 data_utils.py /global/cfs/projectdirs/m3246/mingfong/transfer-learning/delphes_train_set/train_14.h5 /pscratch/sd/m/mingfong/transfer-learning/delphes_train_processed/ &
 
 
-# test dataset
-srun --exclusive -n 1 -c 32 --cpu_bind=cores python3 data_utils.py /global/cfs/projectdirs/m3246/mingfong/transfer-learning/delphes_test_set/test_0.h5 /pscratch/sd/m/mingfong/transfer-learning/delphes_test_processed/ &
-srun --exclusive -n 1 -c 32 --cpu_bind=cores python3 data_utils.py /global/cfs/projectdirs/m3246/mingfong/transfer-learning/delphes_test_set/test_1.h5 /pscratch/sd/m/mingfong/transfer-learning/delphes_test_processed/ &
+# fastsim test dataset
+# srun --exclusive -n 1 -c 32 --cpu_bind=cores python3 data_utils.py /global/cfs/projectdirs/m3246/mingfong/transfer-learning/delphes_test_set/test_0.h5 /pscratch/sd/m/mingfong/transfer-learning/delphes_test_processed/ &
+# srun --exclusive -n 1 -c 32 --cpu_bind=cores python3 data_utils.py /global/cfs/projectdirs/m3246/mingfong/transfer-learning/delphes_test_set/test_1.h5 /pscratch/sd/m/mingfong/transfer-learning/delphes_test_processed/ &
+
+# fullsim train
+# srun --exclusive -n 1 -c 64 --cpu_bind=cores python3 data_utils.py /global/cfs/projectdirs/m3246/mingfong/transfer-learning/train.h5 /pscratch/sd/m/mingfong/transfer-learning/ &
+
+# fullsim test
+# srun --exclusive -n 1 -c 64 --cpu_bind=cores python3 data_utils.py /global/cfs/projectdirs/m3246/mingfong/transfer-learning/test.h5 /pscratch/sd/m/mingfong/transfer-learning/ &
 
 wait
