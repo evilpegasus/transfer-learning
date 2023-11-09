@@ -19,10 +19,7 @@ from wandb.keras import WandbMetricsLogger, WandbModelCheckpoint
 
 from data_utils import preprocess_data, H5Dataset, H5Dataset2
 
-train_dir = "/global/ml4hep/spss/mfong/transfer_learning/delphes_train/"
-train_dir_preprocess = "/global/ml4hep/spss/mfong/transfer_learning/delphes_train_processed/"
-train_filepaths = [train_dir + x for x in os.listdir(train_dir)]
-# preprocess_data(train_filepaths, train_dir_preprocess, force=False)
+train_dir_preprocess = "/pscratch/sd/m/mingfong/transfer-learning/delphes_train_processed/"   # directory of preprocessed training data
 train_preprocess_file_names = os.listdir(train_dir_preprocess)
 train_preprocess_filepaths = [train_dir_preprocess + name for name in train_preprocess_file_names]
 

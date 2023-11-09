@@ -5,7 +5,7 @@
 #SBATCH -J Preprocess
 #SBATCH --mail-user=mingfong@berkeley.edu
 #SBATCH --mail-type=ALL
-#SBATCH -t 06:01:01
+#SBATCH -t 04:01:01
 #SBATCH --account=m3246
 #SBATCH --qos=regular
 
@@ -42,9 +42,9 @@ conda activate jax
 # srun --exclusive -n 1 -c 32 --cpu_bind=cores python3 data_utils.py /global/cfs/projectdirs/m3246/mingfong/transfer-learning/delphes_test_set/test_1.h5 /pscratch/sd/m/mingfong/transfer-learning/delphes_test_processed/ &
 
 # fullsim train
-# srun --exclusive -n 1 -c 64 --cpu_bind=cores python3 data_utils.py /global/cfs/projectdirs/m3246/mingfong/transfer-learning/train.h5 /pscratch/sd/m/mingfong/transfer-learning/ &
+srun --exclusive -n 1 -c 32 --cpu_bind=cores python3 data_utils.py /global/cfs/projectdirs/m3246/mingfong/transfer-learning/train.h5 /pscratch/sd/m/mingfong/transfer-learning/ &
 
 # fullsim test
-# srun --exclusive -n 1 -c 64 --cpu_bind=cores python3 data_utils.py /global/cfs/projectdirs/m3246/mingfong/transfer-learning/test.h5 /pscratch/sd/m/mingfong/transfer-learning/ &
+# srun --exclusive -n 1 -c 32 --cpu_bind=cores python3 data_utils.py /global/cfs/projectdirs/m3246/mingfong/transfer-learning/test.h5 /pscratch/sd/m/mingfong/transfer-learning/ &
 
 wait
