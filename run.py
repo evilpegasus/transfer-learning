@@ -11,38 +11,156 @@ from absl import logging, app, flags
 import numpy as np
 import jax
 import jax.numpy as jnp
-
-
+import wandb
+from tqdm import tqdm
+import optax
+from flax.training import train_state
+from torch.utils.data import Dataset, DataLoader
+from sklearn.metrics import roc_auc_score
+import models
 
 flags.DEFINE_string("optimizer", "adam", "Optimizer to use.")
 flags.DEFINE_integer("epochs", 400, "Number of epochs.")
-flags.DEFINE_integer("eval_every", 50, 'Evaluation frequency (in steps).')
-flags.DEFINE_integer("test_every", 500, 'Evaluation frequency (in steps).')
+flags.DEFINE_integer("eval_every", 1, 'Evaluation frequency (in steps).')
+# flags.DEFINE_integer("test_every", 500, 'Evaluation frequency (in steps).')
 flags.DEFINE_float("learning_rate", 0.001, "Learning rate.")
 flags.DEFINE_integer("batch_size", 1024, "Batch size.")
+flags.DEFINE_string("loss", "binary_crossentropy", "Loss function.")
 flags.DEFINE_integer("seed", 8, "Random seed.")
-
 
 FLAGS = flags.FLAGS
 
 
+def init_train_state(rng_key, model, optimizer, batch):
+  """Initialize training state."""
+  params = model.init(rng_key, batch)
+  return train_state.TrainState.create(
+      apply_fn=model.apply,
+      params=params,
+      tx=optimizer)
+
+
+@jax.jit
+def train_step(
+  state: train_state.TrainState,
+  batch: jnp.ndarray,
+  ):
+  """Perform a single training step."""
+  x, y = batch
+  def loss_fn(params):
+    logits = state.apply_fn(params, batch)
+    loss = jnp.mean(optax.sigmoid_binary_cross_entropy(logits=logits, labels=y))
+    return loss, logits
+  grad_fn = jax.value_and_grad(loss_fn, has_aux=True)
+  (loss, logits), grad = grad_fn(state.params)
+  state = state.apply_gradients(grads=grad)
+  return state, loss, logits
+
+
+@jax.jit
+def eval_step(
+  state: train_state.TrainState,
+  batch: jnp.ndarray,
+  ):
+  """Perform a single evaluation step."""
+  x, y = batch
+  logits = state.apply_fn(state.params, batch)
+  loss = jnp.mean(optax.sigmoid_binary_cross_entropy(logits=logits, labels=y))
+  return loss, logits
 
 def main(unused_args):
-  
+  logging.warning(f"unsed_args: {unused_args}")
+
   rng = np.random.RandomState(FLAGS.seed)
   rng_key = jax.random.PRNGKey(rng.randint(2**32))
   logging.info("rng_key: %s", rng_key)
+  logging.info("Devices: %s", jax.devices())
+    
+  # Initialize data
+  logging.info("Initializing data...")
+  train_dir_preprocess = "/pscratch/sd/m/mingfong/transfer-learning/delphes_train_processed/"   # directory of preprocessed training data TODO put this in config
+  train_preprocess_file_names = os.listdir(train_dir_preprocess)
+  train_preprocess_filepaths = [train_dir_preprocess + name for name in train_preprocess_file_names]
+
+  train_dataset = data_utils.H5Dataset2(train_preprocess_filepaths[0:4], transform=None)
+  train_dataloader = DataLoader(train_dataset, batch_size=FLAGS.batch_size, shuffle=False)
+  logging.info("Num train samples: %s", len(train_dataset))
+
+  val_dataset = data_utils.H5Dataset2(train_preprocess_filepaths[5:6], transform=None)
+  val_dataloader = DataLoader(val_dataset, batch_size=FLAGS.batch_size, shuffle=False)
+  logging.info("Num test samples %s", len(val_dataset))
+
+  dummy_input = next(iter(train_dataloader))[0]
+  logging.info("Input shape: %s", dummy_input.shape)
+
+  # WandB setup
+  config = {
+  "epochs": FLAGS.epochs,
+  "batch_size": FLAGS.batch_size,
+  "learning_rate": FLAGS.learning_rate,
+  "optimizer": FLAGS.optimizer,
+  "loss": "binary_crossentropy",
+  "train_samples": len(train_dataset),
+  "test_samples": len(val_dataset),
+  }
+  # wandb_run = wandb.init(
+  #   project="delphes_pretrain",
+  #   name=f"MLP_delphes",
+  #   config=config, reinit=True
+  # )
   
+  # Initialize model
+  logging.info("Initializing model")
+  model = models.MLP(features=[64, 8, 1])
+  params = model.init(rng_key, dummy_input)
+  logging.info(jax.tree_map(lambda x: x.shape, params))
+
+  if FLAGS.optimizer == "adam":
+    opt = optax.adam(FLAGS.learning_rate)
+  else:
+    raise ValueError(f"Unsupported optimizer: {FLAGS.optimizer}")
+  state = init_train_state(rng_key, model, opt, dummy_input)
+  
+  # Training loop
   logging.info("Starting training")
-  print("asdfasdfasdfasfasdfasdfasdf")
-  logging.info("logging.info example")
-  logging.warning("logging.warning example")
-  logging.error("logging.error example")
-  # logging.fatal("logging.fatal example")
-  logging.debug("logging.debug example")
+  for epoch in tqdm(range(FLAGS.epochs)):
+    best_val_loss = 1e9
+    
+    # Training
+    train_datagen = iter(train_dataloader)
+    train_batch_matrics = {
+      "loss": [],
+      "accuracy": [],
+      "auc": [],
+    }
+    for batch_index in range(len(train_dataloader)):
+      batch = next(train_datagen)
+      state, loss, logits = train_step(state, batch)
+      train_batch_matrics["loss"].append(loss)
+      train_batch_matrics["accuracy"].append(jnp.mean((logits > 0) == batch[1]))
+      train_batch_matrics["auc"].append(roc_auc_score(batch[1], logits))   
+      print(train_batch_matrics)   
+      raise ValueError("stop")
+    
+    # Validation
+    # if epoch % FLAGS.eval_every == 0:
+    if epoch % 10 == 0:
+      val_datagen = iter(val_dataloader)
+      val_batch_matrics = {
+        "loss": [],
+        "accuracy": [],
+        "auc": [],
+      }
+      for batch_index in range(len(val_dataloader)):
+        batch = next(val_datagen)
+        loss, logits = eval_step(state, batch)
+        val_batch_matrics["loss"].append(loss)
+        val_batch_matrics["accuracy"].append(jnp.mean((logits > 0) == batch[1]))
+        val_batch_matrics["auc"].append(roc_auc_score(batch[1], logits))
+      
 
-
-
+  wandb.finish()
+  
 
 if __name__ == "__main__":
   app.run(main)
