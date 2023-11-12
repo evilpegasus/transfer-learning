@@ -5,6 +5,7 @@ Ming Fong
 LBNL 2023
 """
 
+from typing import Sequence
 import os
 import data_utils
 from absl import logging, app, flags
@@ -18,6 +19,7 @@ from flax.training import train_state
 from torch.utils.data import Dataset, DataLoader
 from sklearn.metrics import roc_auc_score
 import models
+
 
 flags.DEFINE_string("optimizer", "adam", "Optimizer to use.")
 flags.DEFINE_integer("epochs", 400, "Number of epochs.")
@@ -43,12 +45,12 @@ def init_train_state(rng_key, model, optimizer, batch):
 @jax.jit
 def train_step(
   state: train_state.TrainState,
-  batch: jnp.ndarray,
+  batch: Sequence[jnp.ndarray],
   ):
   """Perform a single training step."""
   x, y = batch
   def loss_fn(params):
-    logits = state.apply_fn(params, batch)
+    logits = state.apply_fn(params, x)
     loss = jnp.mean(optax.sigmoid_binary_cross_entropy(logits=logits, labels=y))
     return loss, logits
   grad_fn = jax.value_and_grad(loss_fn, has_aux=True)
@@ -64,7 +66,7 @@ def eval_step(
   ):
   """Perform a single evaluation step."""
   x, y = batch
-  logits = state.apply_fn(state.params, batch)
+  logits = state.apply_fn(state.params, x)
   loss = jnp.mean(optax.sigmoid_binary_cross_entropy(logits=logits, labels=y))
   return loss, logits
 
@@ -83,11 +85,13 @@ def main(unused_args):
   train_preprocess_filepaths = [train_dir_preprocess + name for name in train_preprocess_file_names]
 
   train_dataset = data_utils.H5Dataset2(train_preprocess_filepaths[0:4], transform=None)
-  train_dataloader = DataLoader(train_dataset, batch_size=FLAGS.batch_size, shuffle=False)
+  # train_dataloader = DataLoader(train_dataset, batch_size=FLAGS.batch_size, shuffle=False)
+  train_dataloader = data_utils.JaxDataLoader(train_dataset, batch_size=FLAGS.batch_size, shuffle=False)
   logging.info("Num train samples: %s", len(train_dataset))
 
   val_dataset = data_utils.H5Dataset2(train_preprocess_filepaths[5:6], transform=None)
-  val_dataloader = DataLoader(val_dataset, batch_size=FLAGS.batch_size, shuffle=False)
+  # val_dataloader = DataLoader(val_dataset, batch_size=FLAGS.batch_size, shuffle=False)
+  val_dataloader = data_utils.JaxDataLoader(val_dataset, batch_size=FLAGS.batch_size, shuffle=False)
   logging.info("Num test samples %s", len(val_dataset))
 
   dummy_input = next(iter(train_dataloader))[0]
@@ -138,13 +142,10 @@ def main(unused_args):
       state, loss, logits = train_step(state, batch)
       train_batch_matrics["loss"].append(loss)
       train_batch_matrics["accuracy"].append(jnp.mean((logits > 0) == batch[1]))
-      train_batch_matrics["auc"].append(roc_auc_score(batch[1], logits))   
-      print(train_batch_matrics)   
-      raise ValueError("stop")
+      train_batch_matrics["auc"].append(roc_auc_score(batch[1], logits))
     
     # Validation
-    # if epoch % FLAGS.eval_every == 0:
-    if epoch % 10 == 0:
+    if epoch % FLAGS.eval_every == 0:
       val_datagen = iter(val_dataloader)
       val_batch_matrics = {
         "loss": [],
@@ -157,10 +158,22 @@ def main(unused_args):
         val_batch_matrics["loss"].append(loss)
         val_batch_matrics["accuracy"].append(jnp.mean((logits > 0) == batch[1]))
         val_batch_matrics["auc"].append(roc_auc_score(batch[1], logits))
-      
+    
+    # Log metrics
+    wandb.log({
+      "train_loss": np.mean(train_batch_matrics["loss"]),
+      "train_accuracy": np.mean(train_batch_matrics["accuracy"]),
+      "train_auc": np.mean(train_batch_matrics["auc"]),
+      "val_loss": np.mean(val_batch_matrics["loss"]),
+      "val_accuracy": np.mean(val_batch_matrics["accuracy"]),
+      "val_auc": np.mean(val_batch_matrics["auc"]),
+    }, step=epoch)
 
   wandb.finish()
   
 
 if __name__ == "__main__":
   app.run(main)
+
+
+# https://wandb.ai/jax-series/simple-training-loop/reports/Writing-a-Training-Loop-in-JAX-and-Flax--VmlldzoyMzA4ODEy

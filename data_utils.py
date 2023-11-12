@@ -2,7 +2,9 @@ import sys
 import os
 from typing import List
 import h5py
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset, DataLoader, default_collate
+from jax.tree_util import tree_map
+import jax.numpy as jnp
 import numpy as np
 import preprocessing
 from tqdm import tqdm
@@ -197,24 +199,36 @@ class H5Dataset2(Dataset):
     with h5py.File(self.filepaths[filepath_idx], "r") as file:
       labels = file[self.LABEL_KEY][sample_idx]
       data = file[self.DATA_KEY][sample_idx]
-    
-    # if self.preprocessed:
-    #   data = self.opened_file[self.DATA_KEY][sample_idx]
-    # else:
-    #   data = preprocessing.constituent({
-    #     "fjet_clus_eta": self.opened_file["fjet_clus_eta"][sample_idx],
-    #     "fjet_clus_phi": self.opened_file["fjet_clus_phi"][sample_idx],
-    #     "fjet_clus_pt": self.opened_file["fjet_clus_pt"][sample_idx],
-    #     "fjet_clus_E": self.opened_file["fjet_clus_E"][sample_idx],
-    #   }, 200)
 
     # if self.transform:
     #   data = self.transform(data)
 
-    data = np.asarray(data).flatten()
+    data = np.ravel(np.asarray(data, dtype=jnp.float32))
     labels = np.asarray(labels)
     return data, labels
 
+
+def numpy_collate(batch):
+  return tree_map(np.asarray, default_collate(batch))
+
+
+class JaxDataLoader(DataLoader):
+  def __init__(self, dataset, batch_size=1,
+                shuffle=False, sampler=None,
+                batch_sampler=None, num_workers=0,
+                pin_memory=False, drop_last=False,
+                timeout=0, worker_init_fn=None):
+    super(self.__class__, self).__init__(dataset,
+        batch_size=batch_size,
+        shuffle=shuffle,
+        sampler=sampler,
+        batch_sampler=batch_sampler,
+        num_workers=num_workers,
+        collate_fn=numpy_collate,
+        pin_memory=pin_memory,
+        drop_last=drop_last,
+        timeout=timeout,
+        worker_init_fn=worker_init_fn)
 
 
 if __name__ == "__main__":
