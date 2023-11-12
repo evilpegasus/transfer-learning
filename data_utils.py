@@ -8,7 +8,7 @@ import preprocessing
 from tqdm import tqdm
 from pathlib import Path
 
-def preprocess_data(train_filepaths: List[str], target_dir: str, force=False):
+def preprocess_data(train_filepaths: List[str], target_dir: str, force: bool=False, low_memory: bool=True, num_constituents: int=200):
   """Preprocesses h5 data from train_filepaths using the preprocess.py script and stores it as h5 files in target_dir. Use absolute paths"""
   # make the path if it got purged from pscratch
   Path(target_dir).mkdir(parents=True, exist_ok=True)
@@ -22,15 +22,34 @@ def preprocess_data(train_filepaths: List[str], target_dir: str, force=False):
     if not force and target_filepath in target_dir_filepaths:
       print(f"{target_filepath} is already in target_dir, skipping this file")
       continue
-    with h5py.File(filepath, 'r') as old_file, h5py.File(target_filepath, "w") as new_file:
+    with h5py.File(filepath, 'r') as original_file, h5py.File(target_filepath, "w") as new_file:
       print("Working on", filepath)
-      processed_data = preprocessing.constituent(old_file, 200)
-      labels = old_file["labels"]
-      print(f"Saving preprocessed data to {target_filepath}")
-      dset = new_file.create_dataset("data", processed_data.shape)
-      dset[:] = processed_data
-      labels_dset = new_file.create_dataset("labels", labels.shape)
-      labels_dset[:] = labels
+      if low_memory:
+        chunk_size = 10000
+        print(f"Low memory mode, processing {chunk_size} samples at a time")
+        num_samples = len(original_file["labels"])
+        dset_shape = (num_samples, num_constituents, 7)     # 200 constituents, 7 features
+        dset = new_file.create_dataset("data", dset_shape)
+        labels_dset = new_file.create_dataset("labels", num_samples)
+        for i in tqdm(range(0, num_samples, chunk_size)):
+          data_dict_chunk = {
+            "fjet_clus_eta": original_file["fjet_clus_eta"][i:i+chunk_size],
+            "fjet_clus_phi": original_file["fjet_clus_phi"][i:i+chunk_size],
+            "fjet_clus_pt": original_file["fjet_clus_pt"][i:i+chunk_size],
+            "fjet_clus_E": original_file["fjet_clus_E"][i:i+chunk_size],
+          }
+          processed_data_chunk = preprocessing.constituent(data_dict_chunk, num_constituents)
+          labels_chunk = original_file["labels"][i:i+chunk_size]
+          dset[i:i+chunk_size] = processed_data_chunk
+          labels_dset[i:i+chunk_size] = labels_chunk
+      else:
+        processed_data = preprocessing.constituent(original_file, num_constituents)
+        labels = original_file["labels"]
+        print(f"Saving preprocessed data to {target_filepath}")
+        dset = new_file.create_dataset("data", processed_data.shape)
+        dset[:] = processed_data
+        labels_dset = new_file.create_dataset("labels", labels.shape)
+        labels_dset[:] = labels
 
 
 class H5Dataset(Dataset):
