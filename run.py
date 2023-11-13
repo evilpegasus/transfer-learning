@@ -107,11 +107,11 @@ def main(unused_args):
   "train_samples": len(train_dataset),
   "test_samples": len(val_dataset),
   }
-  # wandb_run = wandb.init(
-  #   project="delphes_pretrain",
-  #   name=f"MLP_delphes",
-  #   config=config, reinit=True
-  # )
+  wandb_run = wandb.init(
+    project="delphes_pretrain",
+    name=f"MLP_delphes",
+    config=config, reinit=True
+  )
   
   # Initialize model
   logging.info("Initializing model")
@@ -127,7 +127,9 @@ def main(unused_args):
   
   # Training loop
   logging.info("Starting training")
-  for epoch in tqdm(range(FLAGS.epochs)):
+  batch_step = 0    # for batch-level logging wandb
+  for epoch in range(FLAGS.epochs):
+    print(f"Epoch {epoch}/{FLAGS.epochs}")
     best_val_loss = 1e9
     
     # Training
@@ -137,12 +139,23 @@ def main(unused_args):
       "accuracy": [],
       "auc": [],
     }
-    for batch_index in range(len(train_dataloader)):
+    pbar = tqdm(range(len(train_dataloader)))
+    for batch_index in pbar:
       batch = next(train_datagen)
       state, loss, logits = train_step(state, batch)
+      accuracy = jnp.mean((logits > 0) == batch[1])
+      auc = roc_auc_score(batch[1], logits)
       train_batch_matrics["loss"].append(loss)
-      train_batch_matrics["accuracy"].append(jnp.mean((logits > 0) == batch[1]))
-      train_batch_matrics["auc"].append(roc_auc_score(batch[1], logits))
+      train_batch_matrics["accuracy"].append(accuracy)
+      train_batch_matrics["auc"].append(auc)
+      
+      pbar.set_description(f"loss: {loss:.4f}, accuracy: {accuracy:.4f}, auc: {auc:.4f}")
+      # batch level logging
+      wandb.log({
+        "batch/train_loss": loss,
+        "batch/train_accuracy": accuracy,
+        "batch/train_auc": auc,
+      }, step=batch_step)
     
     # Validation
     if epoch % FLAGS.eval_every == 0:
