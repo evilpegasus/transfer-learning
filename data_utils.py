@@ -1,3 +1,9 @@
+"""
+Data loading utils for delphes and fullsim datasets.
+
+Ming Fong
+LBNL 2023
+"""
 import sys
 import os
 from typing import List
@@ -9,6 +15,7 @@ import numpy as np
 import preprocessing
 from tqdm import tqdm
 from pathlib import Path
+
 
 def preprocess_data(train_filepaths: List[str], target_dir: str, force: bool=False, low_memory: bool=True, num_constituents: int=200):
   """Preprocesses h5 data from train_filepaths using the preprocess.py script and stores it as h5 files in target_dir. Use absolute paths"""
@@ -153,7 +160,6 @@ class H5Dataset(Dataset):
   # def _get_loaded_file(self):
   #   """Returns the name of the h5 files currently loaded into memory"""
   #   return self.filepaths[self.loaded_file_idx]
-
 
 
 class H5Dataset2(Dataset):
