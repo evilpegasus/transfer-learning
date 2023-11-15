@@ -52,11 +52,6 @@ def train_step(
   def loss_fn(params):
     logits = state.apply_fn(params, x).squeeze()
     loss = jnp.mean(optax.sigmoid_binary_cross_entropy(logits=logits, labels=y))
-    # print(logits.shape)
-    # print(y.shape)
-    # print(loss)
-    # print(optax.sigmoid_binary_cross_entropy(logits=logits, labels=y).shape)
-    # raise ValueError()
     return loss, logits
   grad_fn = jax.value_and_grad(loss_fn, has_aux=True)
   (loss, logits), grad = grad_fn(state.params)
@@ -71,7 +66,7 @@ def eval_step(
   ):
   """Perform a single evaluation step."""
   x, y = batch
-  logits = state.apply_fn(state.params, x)
+  logits = state.apply_fn(state.params, x).squeeze()
   loss = jnp.mean(optax.sigmoid_binary_cross_entropy(logits=logits, labels=y))
   return loss, logits
 
