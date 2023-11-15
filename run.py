@@ -16,7 +16,6 @@ import wandb
 from tqdm import tqdm
 import optax
 from flax.training import train_state
-from torch.utils.data import Dataset, DataLoader
 from sklearn.metrics import roc_auc_score
 import models
 
@@ -29,6 +28,7 @@ flags.DEFINE_float("learning_rate", 0.001, "Learning rate.")
 flags.DEFINE_integer("batch_size", 1024, "Batch size.")
 flags.DEFINE_string("loss", "binary_crossentropy", "Loss function.")
 flags.DEFINE_integer("seed", 8, "Random seed.")
+flags.DEFINE_integer("num_files", 1, "Number of files to use for training.")
 
 FLAGS = flags.FLAGS
 
@@ -50,8 +50,13 @@ def train_step(
   """Perform a single training step."""
   x, y = batch
   def loss_fn(params):
-    logits = state.apply_fn(params, x)
+    logits = state.apply_fn(params, x).squeeze()
     loss = jnp.mean(optax.sigmoid_binary_cross_entropy(logits=logits, labels=y))
+    # print(logits.shape)
+    # print(y.shape)
+    # print(loss)
+    # print(optax.sigmoid_binary_cross_entropy(logits=logits, labels=y).shape)
+    # raise ValueError()
     return loss, logits
   grad_fn = jax.value_and_grad(loss_fn, has_aux=True)
   (loss, logits), grad = grad_fn(state.params)
@@ -84,15 +89,13 @@ def main(unused_args):
   train_preprocess_file_names = os.listdir(train_dir_preprocess)
   train_preprocess_filepaths = [train_dir_preprocess + name for name in train_preprocess_file_names]
 
-  train_dataset = data_utils.H5Dataset2(train_preprocess_filepaths[0:4], transform=None)
-  # train_dataloader = DataLoader(train_dataset, batch_size=FLAGS.batch_size, shuffle=False)
+  train_dataset = data_utils.H5Dataset2(train_preprocess_filepaths[0:FLAGS.num_files])      # pick h5Dataset class 1-4 for various loading methods (see data_utils.py)
   train_dataloader = data_utils.JaxDataLoader(train_dataset, batch_size=FLAGS.batch_size, shuffle=False)
   logging.info("Num train samples: %s", len(train_dataset))
 
-  val_dataset = data_utils.H5Dataset2(train_preprocess_filepaths[5:6], transform=None)
-  # val_dataloader = DataLoader(val_dataset, batch_size=FLAGS.batch_size, shuffle=False)
+  val_dataset = data_utils.H5Dataset2(train_preprocess_filepaths[-2:-1])
   val_dataloader = data_utils.JaxDataLoader(val_dataset, batch_size=FLAGS.batch_size, shuffle=False)
-  logging.info("Num test samples %s", len(val_dataset))
+  logging.info("Num val samples %s", len(val_dataset))
 
   dummy_input = next(iter(train_dataloader))[0]
   logging.info("Input shape: %s", dummy_input.shape)
@@ -115,7 +118,7 @@ def main(unused_args):
   
   # Initialize model
   logging.info("Initializing model")
-  model = models.MLP(features=[64, 8, 1])
+  model = models.MLP(features=[128, 64, 1])
   params = model.init(rng_key, dummy_input)
   logging.info(jax.tree_map(lambda x: x.shape, params))
 
@@ -127,7 +130,6 @@ def main(unused_args):
   
   # Training loop
   logging.info("Starting training")
-  batch_step = 0    # for batch-level logging wandb
   for epoch in range(FLAGS.epochs):
     print(f"Epoch {epoch}/{FLAGS.epochs}")
     best_val_loss = 1e9
@@ -155,7 +157,7 @@ def main(unused_args):
         "batch/train_loss": loss,
         "batch/train_accuracy": accuracy,
         "batch/train_auc": auc,
-      }, step=batch_step)
+      }, commit=True)
     
     # Validation
     if epoch % FLAGS.eval_every == 0:
@@ -180,7 +182,7 @@ def main(unused_args):
       "val_loss": np.mean(val_batch_matrics["loss"]),
       "val_accuracy": np.mean(val_batch_matrics["accuracy"]),
       "val_auc": np.mean(val_batch_matrics["auc"]),
-    }, step=epoch)
+    }, step=epoch, commit=True)
 
   wandb.finish()
   
