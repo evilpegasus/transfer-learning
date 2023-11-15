@@ -22,8 +22,8 @@ import models
 
 flags.DEFINE_string("optimizer", "adam", "Optimizer to use.")
 flags.DEFINE_integer("epochs", 400, "Number of epochs.")
-flags.DEFINE_integer("eval_every", 1, 'Evaluation frequency (in steps).')
-# flags.DEFINE_integer("test_every", 500, 'Evaluation frequency (in steps).')
+flags.DEFINE_integer("eval_every", 1, 'Evaluation frequency (in epochs).')
+flags.DEFINE_integer("test_every", 1, 'Evaluation frequency (in epochs).')
 flags.DEFINE_float("learning_rate", 0.001, "Learning rate.")
 flags.DEFINE_integer("batch_size", 1024, "Batch size.")
 flags.DEFINE_string("loss", "binary_crossentropy", "Loss function.")
@@ -84,11 +84,11 @@ def main(unused_args):
   train_preprocess_file_names = os.listdir(train_dir_preprocess)
   train_preprocess_filepaths = [train_dir_preprocess + name for name in train_preprocess_file_names]
 
-  train_dataset = data_utils.H5Dataset4(train_preprocess_filepaths[0:FLAGS.num_files])      # pick h5Dataset class 1-4 for various loading methods (see data_utils.py)
+  train_dataset = data_utils.H5Dataset2(train_preprocess_filepaths[0:FLAGS.num_files])      # pick h5Dataset class 1-4 for various loading methods (see data_utils.py)
   train_dataloader = data_utils.JaxDataLoader(train_dataset, batch_size=FLAGS.batch_size, shuffle=False)
   logging.info("Num train samples: %s", len(train_dataset))
 
-  val_dataset = data_utils.H5Dataset4(train_preprocess_filepaths[-2:-1])
+  val_dataset = data_utils.H5Dataset2(train_preprocess_filepaths[-2:-1])
   val_dataloader = data_utils.JaxDataLoader(val_dataset, batch_size=FLAGS.batch_size, shuffle=False)
   logging.info("Num val samples %s", len(val_dataset))
 
