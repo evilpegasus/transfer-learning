@@ -15,6 +15,7 @@ import numpy as np
 import preprocessing
 from tqdm import tqdm
 from pathlib import Path
+from absl import logging
 
 
 def preprocess_data(train_filepaths: List[str], target_dir: str, force: bool=False, low_memory: bool=True, num_constituents: int=200):
@@ -214,11 +215,128 @@ class H5Dataset2(Dataset):
     return data, labels
 
 
+class H5Dataset3(Dataset):
+  """
+  Version of H5Dataset that opens all the h5 files and leaves them open.
+  """
+  def __init__(
+    self,
+    filepaths: List[str],
+    # transform=None,
+    data_key:str="data",
+    label_key:str="labels",
+    ):
+    """Initialize the dataset object
+
+    Args:
+        filepaths (List[str]): List of full Linux filepaths to h5 files
+        transform (Callable[np.ndarray], optional): Optional function that is applied to all samples. Defaults to None.
+        preprocessed (bool, optional): If the data was already preprocessed set this to True. Defaults to True.
+    """
+    self.filepaths = filepaths
+    # self.transform = transform
+    self.DATA_KEY = data_key
+    self.LABEL_KEY = label_key
+    self.sample_indices = []        # Store a tuple of (filepath_idx, sample_idx) for each sample in the dataset
+    self.opened_files = [None] * len(self.filepaths)          # list of opened h5 files
+
+    for filepath_idx, file_path in enumerate(filepaths):
+      self.opened_files[filepath_idx] = h5py.File(file_path, "r")
+      num_samples = len(self.opened_files[filepath_idx][self.LABEL_KEY])
+      indices = list(range(num_samples))
+      self.sample_indices.extend([(filepath_idx, idx) for idx in indices])
+
+  def __len__(self):
+    return len(self.sample_indices)
+
+  def __getitem__(self, idx):
+    """Returns a single sample from the dataset. Opens the h5 file containing the sample if it is not already open"""
+    filepath_idx, sample_idx = self.sample_indices[idx]
+    
+    labels = self.opened_files[filepath_idx][self.LABEL_KEY][sample_idx]
+    data = self.opened_files[filepath_idx][self.DATA_KEY][sample_idx]
+
+    # if self.transform:
+    #   data = self.transform(data)
+
+    data = np.ravel(np.asarray(data, dtype=jnp.float32))
+    labels = np.asarray(labels)
+    return data, labels
+
+
+class H5Dataset4(Dataset):
+  """
+  Version of H5Dataset that loads all data into memory at initialization. Be careful of OOM errors.
+  """
+  def __init__(
+    self,
+    filepaths: List[str],
+    # transform=None,
+    data_key:str="data",
+    label_key:str="labels",
+    ):
+    """Initialize the dataset object
+
+    Args:
+        filepaths (List[str]): List of full Linux filepaths to h5 files
+        transform (Callable[np.ndarray], optional): Optional function that is applied to all samples. Defaults to None.
+        preprocessed (bool, optional): If the data was already preprocessed set this to True. Defaults to True.
+    """
+    self.filepaths = filepaths
+    # self.transform = transform
+    self.DATA_KEY = data_key
+    self.LABEL_KEY = label_key
+    self.data = None
+    self.labels = None
+    self.length = 0
+
+    data_shape = None
+    label_shape = None
+    for filepath in filepaths:
+      with h5py.File(filepath, "r") as file:
+        self.length += len(file[self.LABEL_KEY])
+        # get data and label shape of one sample if not known
+        if data_shape is None:
+          data_shape = file[self.DATA_KEY][0].shape
+        if label_shape is None:
+          label_shape = file[self.LABEL_KEY][0].shape
+
+    # read in all data and labels
+    self.data = np.zeros((self.length, *data_shape), dtype=np.float32)
+    self.labels = np.zeros((self.length, *label_shape), dtype=np.float32)
+    logging.info(f"Created data array with shape {(self.length, *data_shape)}")
+    logging.info(f"Created labels array with shape {(self.length, *label_shape)}")
+    curr_idx = 0
+    for filepath in tqdm(filepaths):
+      with h5py.File(filepath, "r") as file:
+        curr_len = len(file[self.LABEL_KEY])
+        self.data[curr_idx:curr_idx+curr_len] = file[self.DATA_KEY][:]
+        self.labels[curr_idx:curr_idx+curr_len] = file[self.LABEL_KEY][:]
+        curr_idx += curr_len
+
+  def __len__(self):
+    return self.length
+
+  def __getitem__(self, idx):
+    """Returns a single sample from the dataset. Opens the h5 file containing the sample if it is not already open"""    
+    labels = self.labels[idx]
+    data = self.data[idx]
+
+    # if self.transform:
+    #   data = self.transform(data)
+
+    data = np.ravel(np.asarray(data, dtype=jnp.float32))
+    labels = np.asarray(labels)
+    return data, labels
+
+
 def numpy_collate(batch):
+  """Helper function for Dataloader to convert arrays to numpy."""
   return tree_map(np.asarray, default_collate(batch))
 
 
 class JaxDataLoader(DataLoader):
+  """Wrapper for pytorch Dataloader that converts to numpy for jax compatability."""
   def __init__(self, dataset, batch_size=1,
                 shuffle=False, sampler=None,
                 batch_sampler=None, num_workers=0,
