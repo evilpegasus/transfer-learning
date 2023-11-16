@@ -21,7 +21,7 @@ import models
 
 
 flags.DEFINE_string("optimizer", "adam", "Optimizer to use.")
-flags.DEFINE_integer("epochs", 400, "Number of epochs.")
+flags.DEFINE_integer("epochs", 200, "Number of epochs.")
 flags.DEFINE_integer("eval_every", 1, 'Evaluation frequency (in epochs).')
 flags.DEFINE_integer("test_every", 1, 'Evaluation frequency (in epochs).')
 flags.DEFINE_float("learning_rate", 0.001, "Learning rate.")
@@ -77,7 +77,7 @@ def main(unused_args):
   rng_key = jax.random.PRNGKey(rng.randint(2**32))
   logging.info("rng_key: %s", rng_key)
   logging.info("Devices: %s", jax.devices())
-    
+
   # Initialize data
   logging.info("Initializing data...")
   train_dir_preprocess = "/pscratch/sd/m/mingfong/transfer-learning/delphes_train_processed/"   # directory of preprocessed training data TODO put this in config
@@ -101,16 +101,16 @@ def main(unused_args):
   "batch_size": FLAGS.batch_size,
   "learning_rate": FLAGS.learning_rate,
   "optimizer": FLAGS.optimizer,
-  "loss": "binary_crossentropy",
+  "loss": FLAGS.loss,
   "train_samples": len(train_dataset),
   "test_samples": len(val_dataset),
   }
   wandb_run = wandb.init(
     project="delphes_pretrain",
-    name=f"MLP_delphes",
+    name=f"MLP row={int(config['train_samples'] / 1000000)}M lr={config['learning_rate']} bs={config['batch_size']}",
     config=config, reinit=True
   )
-  
+
   # Initialize model
   logging.info("Initializing model")
   model = models.MLP(features=[128, 64, 1])
@@ -122,13 +122,13 @@ def main(unused_args):
   else:
     raise ValueError(f"Unsupported optimizer: {FLAGS.optimizer}")
   state = init_train_state(rng_key, model, opt, dummy_input)
-  
+
   # Training loop
   logging.info("Starting training")
   for epoch in range(FLAGS.epochs):
-    print(f"Epoch {epoch}/{FLAGS.epochs}")
+    # print(f"Epoch {epoch}/{FLAGS.epochs}")
     best_val_loss = 1e9
-    
+
     # Training
     train_datagen = iter(train_dataloader)
     train_batch_matrics = {
@@ -136,9 +136,10 @@ def main(unused_args):
       "accuracy": [],
       "auc": [],
     }
-    pbar = tqdm(range(len(train_dataloader)))
+    # pbar = tqdm(range(len(train_dataloader)))
     max_batch_step = len(train_dataloader) - 1
-    for batch_step in pbar:
+    # for batch_step in pbar:
+    for batch_step in range(len(train_dataloader)):
       batch = next(train_datagen)
       state, loss, logits = train_step(state, batch)
       accuracy = jnp.mean((logits > 0) == batch[1])
@@ -146,16 +147,16 @@ def main(unused_args):
       train_batch_matrics["loss"].append(loss)
       train_batch_matrics["accuracy"].append(accuracy)
       train_batch_matrics["auc"].append(auc)
-      
-      pbar.set_description(f"loss: {loss:.4f}, accuracy: {accuracy:.4f}, auc: {auc:.4f}")
+
+      # pbar.set_description(f"loss: {loss:.4f}, accuracy: {accuracy:.4f}, auc: {auc:.4f}")
       # batch level logging
       wandb.log({
         "batch/train_loss": loss,
         "batch/train_accuracy": accuracy,
         "batch/train_auc": auc,
         "batch/batch_step": batch_step,
-      }, commit=(max_batch_step != batch_step))
-    
+      }, commit=(max_batch_step != batch_step)) # don't commit on last batch, let epoch level logging commit
+
     # Validation
     if epoch % FLAGS.eval_every == 0:
       val_datagen = iter(val_dataloader)
@@ -170,7 +171,14 @@ def main(unused_args):
         val_batch_matrics["loss"].append(loss)
         val_batch_matrics["accuracy"].append(jnp.mean((logits > 0) == batch[1]))
         val_batch_matrics["auc"].append(roc_auc_score(batch[1], logits))
-    
+
+    train_loss = np.mean(train_batch_matrics["loss"])
+    train_acc = np.mean(train_batch_matrics["accuracy"])
+    train_auc = np.mean(train_batch_matrics["auc"])
+    val_loss = np.mean(val_batch_matrics["loss"])
+    val_acc = np.mean(val_batch_matrics["accuracy"])
+    val_auc = np.mean(val_batch_matrics["auc"])
+    logging.info(f"Epoch {epoch}/{FLAGS.epochs}: train_loss: {train_loss:.4f}, train_accuracy: {train_acc:.4f}, train_auc: {train_auc:.4f}, val_loss: {val_loss:.4f}, val_accuracy: {val_acc:.4f}, val_auc: {val_auc:.4f}")
     # Log metrics
     wandb.log({
       "epoch/train_loss": np.mean(train_batch_matrics["loss"]),
