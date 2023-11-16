@@ -266,7 +266,7 @@ class H5Dataset3(Dataset):
 
 class H5Dataset4(Dataset):
   """
-  Version of H5Dataset that loads all data into memory at initialization. Be careful of OOM errors.
+  Version of H5Dataset that loads all data into memory at initialization. Be careful of OOM errors. Much faster than other versions.
   """
   def __init__(
     self,

@@ -137,7 +137,8 @@ def main(unused_args):
       "auc": [],
     }
     pbar = tqdm(range(len(train_dataloader)))
-    for batch_index in pbar:
+    max_batch_step = len(train_dataloader) - 1
+    for batch_step in pbar:
       batch = next(train_datagen)
       state, loss, logits = train_step(state, batch)
       accuracy = jnp.mean((logits > 0) == batch[1])
@@ -152,7 +153,8 @@ def main(unused_args):
         "batch/train_loss": loss,
         "batch/train_accuracy": accuracy,
         "batch/train_auc": auc,
-      }, commit=True)
+        "batch/batch_step": batch_step,
+      }, commit=(max_batch_step != batch_step))
     
     # Validation
     if epoch % FLAGS.eval_every == 0:
@@ -162,7 +164,7 @@ def main(unused_args):
         "accuracy": [],
         "auc": [],
       }
-      for batch_index in range(len(val_dataloader)):
+      for batch_step in range(len(val_dataloader)):
         batch = next(val_datagen)
         loss, logits = eval_step(state, batch)
         val_batch_matrics["loss"].append(loss)
@@ -171,13 +173,14 @@ def main(unused_args):
     
     # Log metrics
     wandb.log({
-      "train_loss": np.mean(train_batch_matrics["loss"]),
-      "train_accuracy": np.mean(train_batch_matrics["accuracy"]),
-      "train_auc": np.mean(train_batch_matrics["auc"]),
-      "val_loss": np.mean(val_batch_matrics["loss"]),
-      "val_accuracy": np.mean(val_batch_matrics["accuracy"]),
-      "val_auc": np.mean(val_batch_matrics["auc"]),
-    }, step=epoch, commit=True)
+      "epoch/train_loss": np.mean(train_batch_matrics["loss"]),
+      "epoch/train_accuracy": np.mean(train_batch_matrics["accuracy"]),
+      "epoch/train_auc": np.mean(train_batch_matrics["auc"]),
+      "epoch/val_loss": np.mean(val_batch_matrics["loss"]),
+      "epoch/val_accuracy": np.mean(val_batch_matrics["accuracy"]),
+      "epoch/val_auc": np.mean(val_batch_matrics["auc"]),
+      "epoch/epoch": epoch,
+    }, commit=True)
 
   wandb.finish()
   
