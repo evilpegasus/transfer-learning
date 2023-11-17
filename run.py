@@ -29,6 +29,8 @@ flags.DEFINE_integer("batch_size", 1024, "Batch size.")
 flags.DEFINE_string("loss", "binary_crossentropy", "Loss function.")
 flags.DEFINE_integer("seed", 8, "Random seed.")
 flags.DEFINE_integer("num_files", 1, "Number of files to use for training.")
+flags.DEFINE_enum("dataload_method", "all", ["single", "all"],
+                  "Method to load data. If single, load one batch at a time (slow, saves memory). If all, load all data into memory (fast, high memory consumption).")
 
 FLAGS = flags.FLAGS
 
@@ -84,11 +86,17 @@ def main(unused_args):
   train_preprocess_file_names = os.listdir(train_dir_preprocess)
   train_preprocess_filepaths = [train_dir_preprocess + name for name in train_preprocess_file_names]
 
-  train_dataset = data_utils.H5Dataset4(train_preprocess_filepaths[0:FLAGS.num_files])      # pick h5Dataset class 1-4 for various loading methods (see data_utils.py)
+  if FLAGS.dataload_method == "single":
+    DatasetClassToUse = data_utils.H5Dataset2
+  elif FLAGS.dataload_method == "all":
+    DatasetClassToUse = data_utils.H5Dataset4
+  else:
+    raise ValueError(f"Unsupported dataload_method: {FLAGS.dataload_method}")
+  train_dataset = DatasetClassToUse(train_preprocess_filepaths[0:FLAGS.num_files])      # pick h5Dataset class 1-4 for various loading methods (see data_utils.py)
   train_dataloader = data_utils.JaxDataLoader(train_dataset, batch_size=FLAGS.batch_size, shuffle=False)
   logging.info("Num train samples: %s", len(train_dataset))
 
-  val_dataset = data_utils.H5Dataset4(train_preprocess_filepaths[-2:-1])
+  val_dataset = DatasetClassToUse(train_preprocess_filepaths[-2:-1])
   val_dataloader = data_utils.JaxDataLoader(val_dataset, batch_size=FLAGS.batch_size, shuffle=False)
   logging.info("Num val samples %s", len(val_dataset))
 
@@ -155,7 +163,7 @@ def main(unused_args):
         "batch/train_loss": loss,
         "batch/train_accuracy": accuracy,
         "batch/train_auc": auc,
-        "batch/batch_step": batch_step,
+        "batch/batch_step": batch_step + epoch * (max_batch_step + 1),
       }, commit=(max_batch_step != batch_step)) # don't commit on last batch, let epoch level logging commit
 
     # Validation

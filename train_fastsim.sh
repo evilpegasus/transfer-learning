@@ -20,4 +20,4 @@ conda activate jax
 #applications may perform better with --gpu-bind=none instead of --gpu-bind=single:1 
 free -h
 nvidia-smi
-srun -n 1 -c 128 --cpu_bind=cores -G 1 --gpu-bind=single:1 python3 run.py --num_files=6
+srun -n 1 -c 128 --cpu_bind=cores -G 1 --gpu-bind=single:1 python3 run.py --num_files=6 --dataload_method=all
