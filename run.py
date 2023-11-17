@@ -107,7 +107,8 @@ def main(unused_args):
   }
   wandb_run = wandb.init(
     project="delphes_pretrain",
-    name=f"MLP row={int(config['train_samples'] / 1000000)}M lr={config['learning_rate']} bs={config['batch_size']}",
+    name=f"MLP rows={int(config['train_samples'] / 1000000)}M lr={config['learning_rate']} B={config['batch_size']}",
+    dir="/pscratch/sd/m/mingfong/transfer-learning/wandb/",
     config=config, reinit=True
   )
 
