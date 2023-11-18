@@ -12,6 +12,7 @@ from absl import logging, app, flags
 import numpy as np
 import jax
 import jax.numpy as jnp
+import flax.linen as nn
 import wandb
 from tqdm import tqdm
 import optax
@@ -125,6 +126,7 @@ def main(unused_args):
   model = models.MLP(features=[128, 64, 1])
   params = model.init(rng_key, dummy_input)
   logging.info(jax.tree_map(lambda x: x.shape, params))
+  logging.info(nn.tabulate(model, rng_key)(dummy_input))
 
   if FLAGS.optimizer == "adam":
     opt = optax.adam(FLAGS.learning_rate)
