@@ -22,7 +22,7 @@ import models
 
 
 flags.DEFINE_string("optimizer", "adam", "Optimizer to use.")
-flags.DEFINE_integer("epochs", 200, "Number of epochs.")
+flags.DEFINE_integer("epochs", 400, "Number of epochs.")
 flags.DEFINE_integer("eval_every", 1, 'Evaluation frequency (in epochs).')
 flags.DEFINE_integer("test_every", 1, 'Evaluation frequency (in epochs).')
 flags.DEFINE_float("learning_rate", 0.001, "Learning rate.")
@@ -32,6 +32,8 @@ flags.DEFINE_integer("seed", 8, "Random seed.")
 flags.DEFINE_integer("num_files", 1, "Number of files to use for training.")
 flags.DEFINE_enum("dataload_method", "all", ["single", "all"],
                   "Method to load data. If single, load one batch at a time (slow, saves memory). If all, load all data into memory (fast, high memory consumption).")
+
+DNN_LAYERS = [400, 400, 400, 400, 400, 1]
 
 FLAGS = flags.FLAGS
 
@@ -116,14 +118,14 @@ def main(unused_args):
   }
   wandb_run = wandb.init(
     project="delphes_pretrain",
-    name=f"MLP rows={int(config['train_samples'] / 1000000)}M lr={config['learning_rate']} B={config['batch_size']}",
+    name=f"MLP rows={int(config['train_samples'] / 1000000)}M lr={config['learning_rate']} B={config['batch_size']} epochs={config['epochs']} dnn_layers={DNN_LAYERS}",
     dir="/pscratch/sd/m/mingfong/transfer-learning/wandb/",
     config=config, reinit=True
   )
 
   # Initialize model
   logging.info("Initializing model")
-  model = models.MLP(features=[128, 64, 1])
+  model = models.MLP(features=DNN_LAYERS)
   params = model.init(rng_key, dummy_input)
   logging.info(jax.tree_map(lambda x: x.shape, params))
   logging.info(nn.tabulate(model, rng_key)(dummy_input))
@@ -136,8 +138,7 @@ def main(unused_args):
 
   # Training loop
   logging.info("Starting training")
-  for epoch in range(FLAGS.epochs):
-    # print(f"Epoch {epoch}/{FLAGS.epochs}")
+  for epoch in range(1, FLAGS.epochs + 1):
     best_val_loss = 1e9
 
     # Training
@@ -160,6 +161,7 @@ def main(unused_args):
       train_batch_matrics["auc"].append(auc)
 
       # pbar.set_description(f"loss: {loss:.4f}, accuracy: {accuracy:.4f}, auc: {auc:.4f}")
+
       # batch level logging
       wandb.log({
         "batch/train_loss": loss,
