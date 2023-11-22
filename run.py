@@ -36,6 +36,9 @@ flags.DEFINE_enum("dataload_method", "all", ["single", "all"],
                   "Method to load data. If single, load one batch at a time (slow, saves memory). If all, load all data into memory (fast, high memory consumption).")
 
 FLAGS = flags.FLAGS
+def process_flags():
+  """Process flags."""
+  FLAGS.dnn_layers = [int(layer) for layer in FLAGS.dnn_layers]
 
 
 def init_train_state(rng_key, model, optimizer, batch):
@@ -76,6 +79,7 @@ def eval_step(
   return loss, logits
 
 def main(unused_args):
+  process_flags()
   logging.warning(f"unsed_args: {unused_args}")
 
   rng = np.random.RandomState(FLAGS.seed)
