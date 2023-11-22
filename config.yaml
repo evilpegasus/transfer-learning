@@ -1,0 +1,2 @@
+train_dir_preprocessed: /pscratch/sd/m/mingfong/transfer-learning/delphes_train_processed/
+test_dir_preprocessed: /pscratch/sd/m/mingfong/transfer-learning/delphes_test_processed/
