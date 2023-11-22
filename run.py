@@ -19,8 +19,10 @@ import optax
 from flax.training import train_state
 from sklearn.metrics import roc_auc_score
 import models
+import yaml
 
 
+flags.DEFINE_list("dnn_layers", [400, 400, 400, 400, 400, 1], "DNN layers.")
 flags.DEFINE_string("optimizer", "adam", "Optimizer to use.")
 flags.DEFINE_integer("epochs", 400, "Number of epochs.")
 flags.DEFINE_integer("eval_every", 1, 'Evaluation frequency (in epochs).')
@@ -32,8 +34,6 @@ flags.DEFINE_integer("seed", 8, "Random seed.")
 flags.DEFINE_integer("num_files", 1, "Number of files to use for training.")
 flags.DEFINE_enum("dataload_method", "all", ["single", "all"],
                   "Method to load data. If single, load one batch at a time (slow, saves memory). If all, load all data into memory (fast, high memory consumption).")
-
-DNN_LAYERS = [400, 400, 400, 400, 400, 1]
 
 FLAGS = flags.FLAGS
 
@@ -118,14 +118,14 @@ def main(unused_args):
   }
   wandb_run = wandb.init(
     project="delphes_pretrain",
-    name=f"MLP rows={int(config['train_samples'] / 1000000)}M lr={config['learning_rate']} B={config['batch_size']} epochs={config['epochs']} dnn_layers={DNN_LAYERS}",
+    name=f"MLP rows={int(config['train_samples'] / 1000000)}M lr={config['learning_rate']} B={config['batch_size']} epochs={config['epochs']} dnn_layers={FLAGS.dnn_layers}",
     dir="/pscratch/sd/m/mingfong/transfer-learning/wandb/",
     config=config, reinit=True
   )
 
   # Initialize model
   logging.info("Initializing model")
-  model = models.MLP(features=DNN_LAYERS)
+  model = models.MLP(features=FLAGS.dnn_layers)
   params = model.init(rng_key, dummy_input)
   logging.info(jax.tree_map(lambda x: x.shape, params))
   logging.info(nn.tabulate(model, rng_key)(dummy_input))
