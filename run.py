@@ -34,8 +34,14 @@ flags.DEFINE_integer("seed", 8, "Random seed.")
 flags.DEFINE_integer("num_files", 1, "Number of files to use for training.")
 flags.DEFINE_enum("dataload_method", "all", ["single", "all"],
                   "Method to load data. If single, load one batch at a time (slow, saves memory). If all, load all data into memory (fast, high memory consumption).")
+flags.DEFINE_string("train_dir", "/pscratch/sd/m/mingfong/transfer-learning/delphes_train_processed/", "Directory of preprocessed training data.")
+flags.DEFINE_string("test_dir", "/pscratch/sd/m/mingfong/transfer-learning/delphes_test_processed/", "Directory of preprocessed testing data.")
+flags.DEFINE_string("wandb_project", "delphes_pretrain", "WandB project name.")
+
 
 FLAGS = flags.FLAGS
+
+
 def process_flags():
   """Process flags."""
   FLAGS.dnn_layers = [int(layer) for layer in FLAGS.dnn_layers]
@@ -89,7 +95,7 @@ def main(unused_args):
 
   # Initialize data
   logging.info("Initializing data...")
-  train_dir_preprocess = "/pscratch/sd/m/mingfong/transfer-learning/delphes_train_processed/"   # directory of preprocessed training data TODO put this in config
+  train_dir_preprocess = FLAGS.train_dir   # directory of preprocessed training data
   train_preprocess_file_names = os.listdir(train_dir_preprocess)
   train_preprocess_filepaths = [train_dir_preprocess + name for name in train_preprocess_file_names]
 
@@ -103,7 +109,7 @@ def main(unused_args):
   train_dataloader = data_utils.JaxDataLoader(train_dataset, batch_size=FLAGS.batch_size, shuffle=False)
   logging.info("Num train samples: %s", len(train_dataset))
 
-  val_dataset = DatasetClassToUse(train_preprocess_filepaths[-2:-1])
+  val_dataset = DatasetClassToUse(train_preprocess_filepaths[-1:])
   val_dataloader = data_utils.JaxDataLoader(val_dataset, batch_size=FLAGS.batch_size, shuffle=False)
   logging.info("Num val samples %s", len(val_dataset))
 
@@ -121,7 +127,7 @@ def main(unused_args):
   "test_samples": len(val_dataset),
   }
   wandb_run = wandb.init(
-    project="delphes_pretrain",
+    project=FLAGS.wandb_project,
     name=f"MLP rows={int(config['train_samples'] / 1000000)}M lr={config['learning_rate']} B={config['batch_size']} epochs={config['epochs']} dnn_layers={FLAGS.dnn_layers}",
     dir="/pscratch/sd/m/mingfong/transfer-learning/wandb/",
     config=config, reinit=True

@@ -21,7 +21,18 @@ conda activate jax
 free -h
 nvidia-smi
 
+# train fastsim
 # GPU nodes can only go up to --dataload_method=all --num_files=7 before OOM error
+# srun -n 1 -c 128 --cpu_bind=cores -G 1 --gpu-bind=single:1 python3 run.py \
+#   --dataload_method=all --epochs=400 --num_files=7 --learning_rate=0.00001 \
+#   --seed=4 --dnn_layers=2000,2000,2000,2000,2000,1 \
+#   --train_dir=/pscratch/sd/m/mingfong/transfer-learning/delphes_train_processed/ \
+#   --wandb_project=delphes_pretrain \
+
+
+# train fullsim
 srun -n 1 -c 128 --cpu_bind=cores -G 1 --gpu-bind=single:1 python3 run.py \
-  --dataload_method=all --epochs=400 --num_files=7 --learning_rate=0.00001 \
-  --seed=4 --dnn_layers=100,100,100,100,100,1
+  --dataload_method=all --epochs=400 --num_files=1 --learning_rate=0.00001 \
+  --seed=4 --dnn_layers=800,800,800,800,800,1 \
+  --train_dir=/pscratch/sd/m/mingfong/transfer-learning/fullsim_train_processed/ \
+  --wandb_project=fullsim \
