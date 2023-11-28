@@ -62,108 +62,7 @@ def preprocess_data(train_filepaths: List[str], target_dir: str, force: bool=Fal
         labels_dset[:] = labels
 
 
-class H5Dataset(Dataset):
-  """
-  Pytorch Dataset class for h5 files that loads in h5 files one at a time to save memory.
-  """
-  def __init__(
-    self,
-    filepaths: List[str],
-    transform=None,
-    preprocessed:bool=True,
-    data_key:str="data",
-    label_key:str="labels",
-    ):
-    """Initialize the dataset object
-
-    Args:
-        filepaths (List[str]): List of full Linux filepaths to h5 files
-        transform (Callable[np.ndarray], optional): Optional function that is applied to all samples. Defaults to None.
-        preprocessed (bool, optional): If the data was already preprocessed set this to True. Defaults to True.
-    """
-    self.filepaths = filepaths
-    self.transform = transform
-    self.preprocessed = preprocessed
-    self.FEATURE_KEYS = ['fjet_clus_eta', 'fjet_clus_phi', 'fjet_clus_pt', 'fjet_clus_E']       # original unprocessed feature keys
-    self.DATA_KEY = data_key
-    self.LABEL_KEY = label_key
-    self.sample_indices = []        # Store a tuple of (filepath_idx, sample_idx) for each sample in the dataset
-    self.opened_file_idx = None     # self.filepaths index that is opened
-    self.opened_file = None         # h5 file that is opened
-
-    for filepath_idx, file_path in enumerate(filepaths):
-      with h5py.File(file_path, "r") as file:
-        num_samples = len(file[self.LABEL_KEY])
-        indices = list(range(num_samples))
-        self.sample_indices.extend([(filepath_idx, idx) for idx in indices])
-
-  def __len__(self):
-    return len(self.sample_indices)
-
-  def __getitem__(self, idx):
-    """Returns a single sample from the dataset. Opens the h5 file containing the sample if it is not already open"""
-    filepath_idx, sample_idx = self.sample_indices[idx]
-    self._open_h5_file(filepath_idx)
-    
-    labels = self.opened_file[self.LABEL_KEY][sample_idx]
-    
-    if self.preprocessed:
-      data = self.opened_file[self.DATA_KEY][sample_idx]
-    else:
-      data = preprocessing.constituent({
-        "fjet_clus_eta": self.opened_file["fjet_clus_eta"][sample_idx],
-        "fjet_clus_phi": self.opened_file["fjet_clus_phi"][sample_idx],
-        "fjet_clus_pt": self.opened_file["fjet_clus_pt"][sample_idx],
-        "fjet_clus_E": self.opened_file["fjet_clus_E"][sample_idx],
-      }, 200)
-
-    # if self.transform:
-    #   data = self.transform(data)
-
-    data = np.asarray(data).flatten()
-    labels = np.asarray(labels)
-    return data, labels
-
-  def _open_h5_file(self, filepath_idx: int):
-    """Opens the h5 file at self.filepaths[filepath_idx]. If another file was open, close it. If the file is already open, do nothing"""
-    if self.opened_file_idx == filepath_idx:
-      return
-    if self.opened_file_idx is not None:
-      self._close_h5_file()
-    filepath = self.filepaths[filepath_idx]
-    self.opened_file = h5py.File(filepath, "r")
-    self.opened_file_idx = filepath_idx
-    
-  def _close_h5_file(self):
-    """Closes the currently opened h5 file. If no file is open, do nothing"""
-    if self.opened_file_idx is None:
-      return
-    self.opened_file.close()
-    self.opened_file_idx = None
-    self.opened_file = None
-  
-  def get_opened_file(self) -> str:
-    """Returns the name of the h5 files currently opened"""
-    return self.filepaths[self.opened_file_idx]
-
-  # NOTE this is too slow
-  # def _load_h5_to_mem(self, file_idx):
-  #   """Loads the data of a single h5 file into memory. If self.loaded_file_idx is already loaded, do nothing"""
-  #   if self.loaded_file_idx == file_idx:
-  #     return
-  #   print("loading file", self.filepaths[file_idx])
-  #   filepath = self.filepaths[file_idx]
-  #   with h5py.File(filepath, "r") as file:
-  #     self.loaded_data = file[self.DATA_KEY][:]
-  #     self.loaded_labels = file[self.LABEL_KEY][:]
-  #   self.loaded_file_idx = file_idx
-
-  # def _get_loaded_file(self):
-  #   """Returns the name of the h5 files currently loaded into memory"""
-  #   return self.filepaths[self.loaded_file_idx]
-
-
-class H5Dataset2(Dataset):
+class H5DatasetLoadSingle(Dataset):
   """
   Version of H5Dataset that opens and closes files for each sample.
   """
@@ -215,7 +114,7 @@ class H5Dataset2(Dataset):
     return data, labels
 
 
-class H5Dataset3(Dataset):
+class H5DatasetLoadSingle2(Dataset):
   """
   Version of H5Dataset that opens all the h5 files and leaves them open.
   """
@@ -264,13 +163,15 @@ class H5Dataset3(Dataset):
     return data, labels
 
 
-class H5Dataset4(Dataset):
+class H5DatasetLoadAll(Dataset):
   """
   Version of H5Dataset that loads all data into memory at initialization. Be careful of OOM errors. Much faster than other versions.
   """
   def __init__(
     self,
     filepaths: List[str],
+    max_rows: int=None,
+    reverse_data: bool=False,
     # transform=None,
     data_key:str="data",
     label_key:str="labels",
@@ -279,8 +180,9 @@ class H5Dataset4(Dataset):
 
     Args:
         filepaths (List[str]): List of full Linux filepaths to h5 files
+        max_rows (int, optional): Maximum number of rows to load from each file. Defaults to unlimited.
+        reverse_data (bool, optional): If True, reverse the order of the data. Defaults to False.
         transform (Callable[np.ndarray], optional): Optional function that is applied to all samples. Defaults to None.
-        preprocessed (bool, optional): If the data was already preprocessed set this to True. Defaults to True.
     """
     self.filepaths = filepaths
     # self.transform = transform
@@ -289,7 +191,13 @@ class H5Dataset4(Dataset):
     self.data = None
     self.labels = None
     self.length = 0
+    self.max_rows = max_rows    # total max number of rows to load
+    self.reverse_data = reverse_data
+    
+    if self.reverse_data:
+      filepaths = filepaths[::-1]
 
+    # first pass to get number of samples and array shapes
     data_shape = None
     label_shape = None
     for filepath in filepaths:
@@ -302,6 +210,9 @@ class H5Dataset4(Dataset):
           label_shape = file[self.LABEL_KEY][0].shape
 
     # read in all data and labels
+    if self.max_rows is not None:
+      self.length = min(self.length, self.max_rows)
+
     self.data = np.zeros((self.length, *data_shape), dtype=np.float32)
     self.labels = np.zeros((self.length, *label_shape), dtype=np.float32)
     logging.info(f"Created data array with shape {(self.length, *data_shape)}")
@@ -310,9 +221,17 @@ class H5Dataset4(Dataset):
     for filepath in tqdm(filepaths):
       with h5py.File(filepath, "r") as file:
         curr_len = len(file[self.LABEL_KEY])
-        self.data[curr_idx:curr_idx+curr_len] = file[self.DATA_KEY][:]
-        self.labels[curr_idx:curr_idx+curr_len] = file[self.LABEL_KEY][:]
-        curr_idx += curr_len
+        remaining_len = self.length - curr_idx
+        rows_to_copy = min(curr_len, remaining_len)
+        if self.reverse_data:
+          self.data[curr_idx:curr_idx + rows_to_copy] = file[self.DATA_KEY][-rows_to_copy:]
+          self.labels[curr_idx:curr_idx + rows_to_copy] = file[self.LABEL_KEY][-rows_to_copy:]
+        else:
+          self.data[curr_idx:curr_idx + rows_to_copy] = file[self.DATA_KEY][:rows_to_copy]
+          self.labels[curr_idx:curr_idx + rows_to_copy] = file[self.LABEL_KEY][:rows_to_copy]
+      curr_idx += rows_to_copy
+      if curr_idx >= self.length:
+        break
 
   def __len__(self):
     return self.length

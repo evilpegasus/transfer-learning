@@ -14,12 +14,10 @@ import jax
 import jax.numpy as jnp
 import flax.linen as nn
 import wandb
-from tqdm import tqdm
 import optax
 from flax.training import train_state
 from sklearn.metrics import roc_auc_score
 import models
-import yaml
 
 
 flags.DEFINE_list("dnn_layers", [400, 400, 400, 400, 400, 1], "DNN layers.")
@@ -32,8 +30,10 @@ flags.DEFINE_integer("batch_size", 1024, "Batch size.")
 flags.DEFINE_string("loss", "binary_crossentropy", "Loss function.")
 flags.DEFINE_integer("seed", 8, "Random seed.")
 flags.DEFINE_integer("num_files", 1, "Number of files to use for training.")
+flags.DEFINE_integer("max_train_rows", None, "Maximum number of rows to use for training. If None, use all rows.")
+flags.DEFINE_integer("max_val_rows", None, "Maximum number of rows to use for validation. If None, use all rows.")
 flags.DEFINE_enum("dataload_method", "all", ["single", "all"],
-                  "Method to load data. If single, load one batch at a time (slow, saves memory). If all, load all data into memory (fast, high memory consumption).")
+                  "Method for loading data. If single, load one batch at a time (slow, saves memory). If all, load all data into memory (fast, high memory consumption).")
 flags.DEFINE_string("train_dir", "/pscratch/sd/m/mingfong/transfer-learning/delphes_train_processed/", "Directory of preprocessed training data.")
 flags.DEFINE_string("test_dir", "/pscratch/sd/m/mingfong/transfer-learning/delphes_test_processed/", "Directory of preprocessed testing data.")
 flags.DEFINE_string("wandb_project", "delphes_pretrain", "WandB project name.")
@@ -100,16 +100,17 @@ def main(unused_args):
   train_preprocess_filepaths = [train_dir_preprocess + name for name in train_preprocess_file_names]
 
   if FLAGS.dataload_method == "single":
-    DatasetClassToUse = data_utils.H5Dataset2
+    raise NotImplementedError("single dataload_method not supported")
+    DatasetClassToUse = data_utils.H5DatasetLoadSingle
   elif FLAGS.dataload_method == "all":
-    DatasetClassToUse = data_utils.H5Dataset4
+    DatasetClassToUse = data_utils.H5DatasetLoadAll
   else:
     raise ValueError(f"Unsupported dataload_method: {FLAGS.dataload_method}")
-  train_dataset = DatasetClassToUse(train_preprocess_filepaths[0:FLAGS.num_files])      # pick h5Dataset class 1-4 for various loading methods (see data_utils.py)
+  train_dataset = DatasetClassToUse(train_preprocess_filepaths[0:FLAGS.num_files], max_rows=FLAGS.max_train_rows)
   train_dataloader = data_utils.JaxDataLoader(train_dataset, batch_size=FLAGS.batch_size, shuffle=False)
   logging.info("Num train samples: %s", len(train_dataset))
 
-  val_dataset = DatasetClassToUse(train_preprocess_filepaths[-1:])
+  val_dataset = DatasetClassToUse(train_preprocess_filepaths[-1:], max_rows=FLAGS.max_val_rows, reverse_data=True)
   val_dataloader = data_utils.JaxDataLoader(val_dataset, batch_size=FLAGS.batch_size, shuffle=False)
   logging.info("Num val samples %s", len(val_dataset))
 
@@ -158,9 +159,7 @@ def main(unused_args):
       "accuracy": [],
       "auc": [],
     }
-    # pbar = tqdm(range(len(train_dataloader)))
     max_batch_step = len(train_dataloader) - 1
-    # for batch_step in pbar:
     for batch_step in range(len(train_dataloader)):
       batch = next(train_datagen)
       state, loss, logits = train_step(state, batch)
@@ -169,8 +168,6 @@ def main(unused_args):
       train_batch_matrics["loss"].append(loss)
       train_batch_matrics["accuracy"].append(accuracy)
       train_batch_matrics["auc"].append(auc)
-
-      # pbar.set_description(f"loss: {loss:.4f}, accuracy: {accuracy:.4f}, auc: {auc:.4f}")
 
       # batch level logging
       wandb.log({
@@ -218,6 +215,5 @@ def main(unused_args):
 
 if __name__ == "__main__":
   app.run(main)
-
 
 # https://wandb.ai/jax-series/simple-training-loop/reports/Writing-a-Training-Loop-in-JAX-and-Flax--VmlldzoyMzA4ODEy
