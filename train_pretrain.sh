@@ -24,7 +24,8 @@ nvidia-smi
 # train fastsim
 # GPU nodes can only go up to --dataload_method=all --num_files=7 before OOM error
 srun -n 1 -c 128 --cpu_bind=cores -G 1 --gpu-bind=single:1 python3 run.py \
-  --dataload_method=all --epochs=400 --num_files=7 --learning_rate=0.00001 \
+  --dataload_method=all --epochs=400 \
+  --num_files=7 --learning_rate=0.00001 \
   --seed=4 --dnn_layers=400,400,400,400,400,1 \
   --train_dir=/pscratch/sd/m/mingfong/transfer-learning/delphes_train_processed/ \
-  --wandb_project=delphes_pretrain \
+  --wandb_project=delphes_pretrain
