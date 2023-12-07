@@ -16,3 +16,6 @@ class MLP(nn.Module):
       x = nn.relu(nn.Dense(feat)(x))
     x = nn.Dense(self.features[-1])(x)
     return x
+
+
+# TODO ParticleNet
