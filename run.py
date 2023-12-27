@@ -23,25 +23,34 @@ import models
 import data_utils
 
 flags.DEFINE_list("dnn_layers", [400, 400, 400, 400, 400, 1], "DNN layers.")
-flags.DEFINE_enum("optimizer", "adam", ["adam"],  "Optimizer to use.")
+flags.DEFINE_enum("optimizer", "adam", ["adam"], "Optimizer to use.")
 flags.DEFINE_integer("epochs", 400, "Number of epochs.")
-flags.DEFINE_integer("eval_every", 1, 'Evaluation frequency (in epochs).')
-flags.DEFINE_integer("test_every", 1, 'Evaluation frequency (in epochs).')
+flags.DEFINE_integer("eval_every", 1, "Evaluation frequency (in epochs).")
+flags.DEFINE_integer("test_every", 1, "Evaluation frequency (in epochs).")
 flags.DEFINE_float("learning_rate", 0.0001, "Learning rate.")
 flags.DEFINE_integer("batch_size", 1024, "Batch size.")
 flags.DEFINE_enum("loss", "binary_crossentropy",["binary_crossentropy"], "Loss function.")
 flags.DEFINE_integer("seed", 8, "Random seed.")
 flags.DEFINE_integer("num_files", 1, "Number of files to use for training.")
-flags.DEFINE_integer("max_train_rows", None, "Maximum number of rows to use for training. If None, use all rows.")
-flags.DEFINE_integer("max_val_rows", None, "Maximum number of rows to use for validation. If None, use all rows.")
+flags.DEFINE_integer("max_train_rows", None,
+                     "Maximum number of rows to use for training. If None, use all rows.")
+flags.DEFINE_integer("max_val_rows", None,
+                     "Maximum number of rows to use for validation. If None, use all rows.")
 flags.DEFINE_enum("dataload_method", "all", ["single", "all"],
                   "Method for loading data. If single, load one batch at a time (slow, saves memory). If all, load all data into memory (fast, high memory consumption).")
-flags.DEFINE_string("train_dir", "/pscratch/sd/m/mingfong/transfer-learning/delphes_train_processed/", "Directory of preprocessed training data.")
-flags.DEFINE_string("test_dir", "/pscratch/sd/m/mingfong/transfer-learning/delphes_test_processed/", "Directory of preprocessed testing data.")
-flags.DEFINE_string("wandb_project", "delphes_pretrain", "WandB project name.")
-flags.DEFINE_string("wandb_resume_id", None, "WandB run ID to resume from. Resumes training with previous weights, optimizer state, and epoch., If None, start new run.")
-flags.DEFINE_string("weight_load_dir", None, "Directory to load weights from. If None, randomly initialize weights.")
-
+flags.DEFINE_string("train_dir", "/pscratch/sd/m/mingfong/transfer-learning/delphes_train_processed/",
+                    "Directory of preprocessed training data.")
+flags.DEFINE_string("test_dir", "/pscratch/sd/m/mingfong/transfer-learning/delphes_test_processed/",
+                    "Directory of preprocessed testing data.")
+flags.DEFINE_string("wandb_project", "delphes_pretrain",
+                    "WandB project name.")
+flags.DEFINE_string("wandb_run_path", None,
+                    "Previous WandB run path to load checkpoint. (i.e. mingfong/fullsim/15yzruts). "
+                    "If None or if resume_training is False, create a new run.")
+flags.DEFINE_bool("resume_training", False,
+                  "Whether to resume training from checkpoint. "
+                  "If True, must specify wandb_run_path. "
+                  "If False, only loads weights if wandb_run_path is specified.")
 
 FLAGS = flags.FLAGS
 
@@ -49,8 +58,10 @@ FLAGS = flags.FLAGS
 def process_flags():
   """Process flags."""
   FLAGS.dnn_layers = [int(layer) for layer in FLAGS.dnn_layers]
+  if FLAGS.wandb_run_path is None and FLAGS.resume_training:
+    raise ValueError("Must specify wandb_run_path if resume_training is True.")
 
-
+ 
 def init_train_state(rng_key, model, optimizer, batch):
   """Initialize training state."""
   params = model.init(rng_key, batch)
@@ -135,7 +146,8 @@ def main(unused_args):
     project=FLAGS.wandb_project,
     name=f"MLP rows={int(config['train_samples'] / 1000000)}M lr={config['learning_rate']} B={config['batch_size']} epochs={config['epochs']} dnn_layers={FLAGS.dnn_layers}",
     dir="/pscratch/sd/m/mingfong/transfer-learning/",
-    config=config,
+    config=config, resume="allow",
+    id=FLAGS.wandb_run_path.split("/")[-1] if (FLAGS.wandb_run_path is not None and FLAGS.resume_training) else None,
   )
   # TODO tag wandb run with config params instead of dumping into name
 
@@ -164,10 +176,28 @@ def main(unused_args):
   options = orbax.checkpoint.CheckpointManagerOptions(max_to_keep=5, create=True)
   checkpoint_manager = orbax.checkpoint.CheckpointManager(
     wandb.run.dir + "/orbax_ckpt", orbax_checkpointer, options)
-    
+  
+  if wandb.run.resumed:
+    # Find the latest checkpoint
+    latest_checkpoint = checkpoint_manager.latest_checkpoint()
+
+    if latest_checkpoint is not None:
+      # Restore the latest checkpoint
+      logging.info("Restoring the latest checkpoint: %s", latest_checkpoint)
+      raw_restored = checkpoint_manager.restore(latest_checkpoint)
+      state = raw_restored["state"]
+      start_step = raw_restored["step"] + 1
+    else:
+      logging.info("No checkpoint found. Starting from scratch.")
+      start_step = 1
+  else:
+    logging.info("Training from scratch.")
+    start_step = 1
+
+
   # Training loop
   logging.info("Starting training")
-  for epoch in range(1, FLAGS.epochs + 1):
+  for epoch in range(start_step, FLAGS.epochs + 1):
     best_val_loss = 1e9
 
     # Training
@@ -231,6 +261,7 @@ def main(unused_args):
     ckpt["step"] = epoch
     ckpt["state"] = state
     checkpoint_manager.save(epoch, ckpt, save_kwargs={"save_args": save_args})
+    # wandb.save(wandb.run.dir + "/orbax_ckpt/*")   # crashes when trying to save a removed ckpt
 
   wandb.finish()
   

@@ -22,12 +22,12 @@ free -h
 nvidia-smi
 
 # small testing run command for login node
-# python3 run.py \
-#   --dataload_method=all --epochs=20 \
-#   --num_files=1 --max_train_rows=50000 --max_val_rows=50000 \
-#   --learning_rate=0.00001 --seed=8 --dnn_layers=400,400,400,400,400,1 \
-#   --train_dir=/pscratch/sd/m/mingfong/transfer-learning/fullsim_train_processed/ \
-#   --wandb_project=fullsim
+python3 run.py \
+  --dataload_method=all --epochs=10 \
+  --num_files=1 --max_train_rows=50000 --max_val_rows=20000 \
+  --learning_rate=0.00001 --seed=8 --dnn_layers=400,400,400,400,400,1 \
+  --train_dir=/pscratch/sd/m/mingfong/transfer-learning/fullsim_train_processed/ \
+  --wandb_project=fullsim
 
 # train fullsim
 srun -n 1 -c 128 --cpu_bind=cores -G 1 --gpu-bind=single:1 python3 run.py \
