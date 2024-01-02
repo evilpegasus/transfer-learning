@@ -16,6 +16,7 @@ import flax.linen as nn
 import wandb
 import optax
 from flax.training import train_state, orbax_utils
+from collections import namedtuple
 import orbax.checkpoint
 from sklearn.metrics import roc_auc_score
 import models
@@ -157,9 +158,9 @@ def main(unused_args):
   # Initialize model
   logging.info("Initializing model")
   model = models.MLP(features=FLAGS.dnn_layers)
-  params = model.init(rng_key, dummy_input)
-  logging.info(jax.tree_map(lambda x: x.shape, params))
-  logging.info(nn.tabulate(model, rng_key)(dummy_input))
+  # params = model.init(rng_key, dummy_input)
+  # logging.info(jax.tree_map(lambda x: x.shape, params))
+  # logging.info(nn.tabulate(model, rng_key)(dummy_input))
 
   if FLAGS.optimizer == "adam":
     opt = optax.adam(FLAGS.learning_rate)
@@ -193,13 +194,7 @@ def main(unused_args):
     # checkpoint_path = os.path.join(artifact_dir, "checkpoint")
 
     # Restore the latest checkpoint
-    raw_restored = orbax_checkpointer.restore(artifact_dir)
-    print("DEBUGGING")
-    print("DEBUGGING")
-    print(raw_restored)
-    print("DEBUGGING")
-    print("DEBUGGING")
-    state = raw_restored["state"]
+    raw_restored = orbax_checkpointer.restore(artifact_dir, item=ckpt)
     start_step = raw_restored["step"] + 1
   else:
     logging.info("Training from scratch.")
