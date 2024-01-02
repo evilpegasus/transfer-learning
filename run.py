@@ -42,6 +42,8 @@ flags.DEFINE_string("train_dir", "/pscratch/sd/m/mingfong/transfer-learning/delp
                     "Directory of preprocessed training data.")
 flags.DEFINE_string("test_dir", "/pscratch/sd/m/mingfong/transfer-learning/delphes_test_processed/",
                     "Directory of preprocessed testing data.")
+flags.DEFINE_string("wandb_run_name", None,
+                    "WandB run name. If None, makes a default name with hyperparameters.")
 flags.DEFINE_string("wandb_project", "delphes_pretrain",
                     "WandB project name.")
 flags.DEFINE_string("wandb_run_path", None,
@@ -142,9 +144,10 @@ def main(unused_args):
   "train_samples": len(train_dataset),
   "test_samples": len(val_dataset),
   }
+  wandb_run_name = FLAGS.wandb_run_name if FLAGS.wandb_run_name is not None else f"MLP rows={int(config['train_samples'] / 1000000)}M lr={config['learning_rate']} B={config['batch_size']} epochs={config['epochs']} dnn_layers={FLAGS.dnn_layers}"
   wandb_run = wandb.init(
     project=FLAGS.wandb_project,
-    name=f"MLP rows={int(config['train_samples'] / 1000000)}M lr={config['learning_rate']} B={config['batch_size']} epochs={config['epochs']} dnn_layers={FLAGS.dnn_layers}",
+    name=wandb_run_name,
     dir="/pscratch/sd/m/mingfong/transfer-learning/",
     config=config, resume="allow",
     id=FLAGS.wandb_run_path.split("/")[-1] if (FLAGS.wandb_run_path is not None and FLAGS.resume_training) else None,
@@ -173,23 +176,31 @@ def main(unused_args):
   orbax_checkpointer = orbax.checkpoint.PyTreeCheckpointer()
   save_args = orbax_utils.save_args_from_target(ckpt)
   # orbax_checkpointer.save(wandb.run.dir + "/orbax_ckpt", ckpt, save_args=save_args)   # single save
-  options = orbax.checkpoint.CheckpointManagerOptions(max_to_keep=5, create=True)
-  checkpoint_manager = orbax.checkpoint.CheckpointManager(
-    wandb.run.dir + "/orbax_ckpt", orbax_checkpointer, options)
+  # options = orbax.checkpoint.CheckpointManagerOptions(
+  #   save_interval_steps=1,
+  #   max_to_keep=5,
+  #   create=True)
+  # checkpoint_manager = orbax.checkpoint.CheckpointManager(
+  #   wandb.run.dir + "/orbax_ckpt", orbax_checkpointer, options)
   
   if wandb.run.resumed:
-    # Find the latest checkpoint
-    latest_checkpoint = checkpoint_manager.latest_checkpoint()
+    # restore checkpoint files from wandb previous run
+    logging.info("Restoring checkpoint from previous run")
+    artifact = wandb.use_artifact(
+      f"{wandb.run.name}-checkpoint:latest"
+    )
+    artifact_dir = artifact.download(wandb.run.dir + "/orbax_ckpt")
+    # checkpoint_path = os.path.join(artifact_dir, "checkpoint")
 
-    if latest_checkpoint is not None:
-      # Restore the latest checkpoint
-      logging.info("Restoring the latest checkpoint: %s", latest_checkpoint)
-      raw_restored = checkpoint_manager.restore(latest_checkpoint)
-      state = raw_restored["state"]
-      start_step = raw_restored["step"] + 1
-    else:
-      logging.info("No checkpoint found. Starting from scratch.")
-      start_step = 1
+    # Restore the latest checkpoint
+    raw_restored = orbax_checkpointer.restore(artifact_dir)
+    print("DEBUGGING")
+    print("DEBUGGING")
+    print(raw_restored)
+    print("DEBUGGING")
+    print("DEBUGGING")
+    state = raw_restored["state"]
+    start_step = raw_restored["step"] + 1
   else:
     logging.info("Training from scratch.")
     start_step = 1
@@ -260,8 +271,17 @@ def main(unused_args):
     # save checkpoint
     ckpt["step"] = epoch
     ckpt["state"] = state
-    checkpoint_manager.save(epoch, ckpt, save_kwargs={"save_args": save_args})
-    # wandb.save(wandb.run.dir + "/orbax_ckpt/*")   # crashes when trying to save a removed ckpt
+    checkpoint_dir = wandb.run.dir + "/orbax_ckpt"
+    orbax_checkpointer.save(checkpoint_dir, ckpt, save_args=save_args, force=True)   # single save
+    artifact = wandb.Artifact(f"{wandb.run.name}-checkpoint", type="checkpoint")
+    artifact.add_file(checkpoint_dir + "/checkpoint")
+    wandb.log_artifact(artifact, aliases=["latest", f"step_{epoch}"])
+    # checkpoint_manager.save(epoch, ckpt, save_kwargs={"save_args": save_args})  # using manager
+    
+    
+    
+  # checkpoint_manager.wait_until_finished()
+  # wandb.save(wandb.run.dir + "/orbax_ckpt/*", base_path=wandb.run.dir)   # crashes when trying to save a removed ckpt
 
   wandb.finish()
   
