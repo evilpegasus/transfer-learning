@@ -56,6 +56,7 @@ flags.DEFINE_bool("resume_training", False,
                   "Whether to resume training from checkpoint. "
                   "If True, must specify wandb_run_path. "
                   "If False, only loads weights if wandb_run_path is specified.")
+flags.DEFINE_integer("checkpoint_interval", 1, "Checkpoint interval (in epochs).")
 
 FLAGS = flags.FLAGS
 
@@ -178,26 +179,19 @@ def main(unused_args):
   }
   orbax_checkpointer = orbax.checkpoint.PyTreeCheckpointer()
   save_args = orbax_utils.save_args_from_target(ckpt)
-  # orbax_checkpointer.save(wandb.run.dir + "/orbax_ckpt", ckpt, save_args=save_args)   # single save
-  # options = orbax.checkpoint.CheckpointManagerOptions(
-  #   save_interval_steps=1,
-  #   max_to_keep=5,
-  #   create=True)
-  # checkpoint_manager = orbax.checkpoint.CheckpointManager(
-  #   wandb.run.dir + "/orbax_ckpt", orbax_checkpointer, options)
   
   if wandb.run.resumed:
     # restore checkpoint files from wandb previous run
     logging.info("Restoring checkpoint from previous run")
     artifact = wandb.use_artifact(
-      f"{wandb.run.name}-checkpoint:latest"
+      f"{wandb.run.id}-checkpoint:latest"
     )
     artifact_dir = artifact.download(wandb.run.dir + "/orbax_ckpt")
-    # checkpoint_path = os.path.join(artifact_dir, "checkpoint")
 
     # Restore the latest checkpoint
     raw_restored = orbax_checkpointer.restore(artifact_dir, item=ckpt)
     start_step = raw_restored["step"] + 1
+    state = raw_restored["state"]
   else:
     logging.info("Training from scratch.")
     start_step = 1
@@ -265,20 +259,16 @@ def main(unused_args):
       "epoch/val_auc": np.mean(val_batch_matrics["auc"]),
       "epoch/epoch": epoch,
     }, commit=True)
-    # save checkpoint
-    ckpt["step"] = epoch
-    ckpt["state"] = state
-    checkpoint_dir = wandb.run.dir + "/orbax_ckpt"
-    orbax_checkpointer.save(checkpoint_dir, ckpt, save_args=save_args, force=True)   # single save
-    artifact = wandb.Artifact(f"{wandb.run.name}-checkpoint", type="checkpoint")
-    artifact.add_file(checkpoint_dir + "/checkpoint")
-    wandb.log_artifact(artifact, aliases=["latest", f"step_{epoch}"])
-    # checkpoint_manager.save(epoch, ckpt, save_kwargs={"save_args": save_args})  # using manager
-    
-    
-    
-  # checkpoint_manager.wait_until_finished()
-  # wandb.save(wandb.run.dir + "/orbax_ckpt/*", base_path=wandb.run.dir)   # crashes when trying to save a removed ckpt
+
+    # save checkpoint every checkpoint_interval epochs
+    if epoch % FLAGS.checkpoint_interval == 0:
+      ckpt["step"] = epoch
+      ckpt["state"] = state
+      checkpoint_dir = wandb.run.dir + "/orbax_ckpt"
+      orbax_checkpointer.save(checkpoint_dir, ckpt, save_args=save_args, force=True)   # single save
+      artifact = wandb.Artifact(f"{wandb.run.id}-checkpoint", type="checkpoint")
+      artifact.add_file(checkpoint_dir + "/checkpoint")
+      wandb.log_artifact(artifact, aliases=["latest", f"step_{epoch}"])
 
   wandb.finish()
   
