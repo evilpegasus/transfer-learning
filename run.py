@@ -25,7 +25,8 @@ import data_utils
 
 flags.DEFINE_list("dnn_layers", [400, 400, 400, 400, 400, 1], "DNN layers.")
 flags.DEFINE_enum("optimizer", "adam", ["adam"], "Optimizer to use.")
-flags.DEFINE_integer("epochs", 400, "Number of epochs.")
+flags.DEFINE_integer("epochs", 400, "Number of epochs. "
+                     "If resume_training, this is includes previously run epochs.")
 flags.DEFINE_integer("eval_every", 1, "Evaluation frequency (in epochs).")
 flags.DEFINE_integer("test_every", 1, "Evaluation frequency (in epochs).")
 flags.DEFINE_float("learning_rate", 0.0001, "Learning rate.")
@@ -38,7 +39,8 @@ flags.DEFINE_integer("max_train_rows", None,
 flags.DEFINE_integer("max_val_rows", None,
                      "Maximum number of rows to use for validation. If None, use all rows.")
 flags.DEFINE_enum("dataload_method", "all", ["single", "all"],
-                  "Method for loading data. If single, load one batch at a time (slow, saves memory). If all, load all data into memory (fast, high memory consumption).")
+                  "Method for loading data. If single, load one batch at a time (slow, saves memory). "
+                  "If all, load all data into memory (fast, high memory consumption).")
 flags.DEFINE_string("train_dir", "/pscratch/sd/m/mingfong/transfer-learning/delphes_train_processed/",
                     "Directory of preprocessed training data.")
 flags.DEFINE_string("test_dir", "/pscratch/sd/m/mingfong/transfer-learning/delphes_test_processed/",
