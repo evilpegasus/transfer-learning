@@ -38,4 +38,4 @@ srun -n 1 -c 128 --cpu_bind=cores -G 1 --gpu-bind=single:1 python3 run.py \
   --learning_rate=0.00001 --seed=5 --dnn_layers=400,400,400,400,400,1 \
   --train_dir=/pscratch/sd/m/mingfong/transfer-learning/fullsim_train_processed/ \
   --wandb_project=fullsim --wandb_run_name=fullsim_only \
-  -- checkpoint_interval 10
+  --checkpoint_interval 10
