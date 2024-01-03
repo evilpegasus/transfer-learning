@@ -35,7 +35,7 @@ nvidia-smi
 srun -n 1 -c 128 --cpu_bind=cores -G 1 --gpu-bind=single:1 python3 run.py \
   --dataload_method=all --epochs=400 \
   --num_files=1 --max_train_rows=16384000 --max_val_rows=5242880 \
-  --learning_rate=0.00001 --seed=8 --dnn_layers=400,400,400,400,400,1 \
+  --learning_rate=0.00001 --seed=5 --dnn_layers=400,400,400,400,400,1 \
   --train_dir=/pscratch/sd/m/mingfong/transfer-learning/fullsim_train_processed/ \
   --wandb_project=fullsim --wandb_run_name=fullsim_only \
   -- checkpoint_interval 10
