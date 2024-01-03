@@ -7,16 +7,13 @@ LBNL 2023
 
 from typing import Sequence
 import os
-import shutil
 from absl import logging, app, flags
 import numpy as np
 import jax
 import jax.numpy as jnp
-import flax.linen as nn
 import wandb
 import optax
 from flax.training import train_state, orbax_utils
-from collections import namedtuple
 import orbax.checkpoint
 from sklearn.metrics import roc_auc_score
 import models
