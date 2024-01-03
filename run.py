@@ -140,6 +140,7 @@ def main(unused_args):
 
   # WandB setup
   config = {
+  "seed": FLAGS.seed,
   "epochs": FLAGS.epochs,
   "batch_size": FLAGS.batch_size,
   "learning_rate": FLAGS.learning_rate,
@@ -161,9 +162,6 @@ def main(unused_args):
   # Initialize model
   logging.info("Initializing model")
   model = models.MLP(features=FLAGS.dnn_layers)
-  # params = model.init(rng_key, dummy_input)
-  # logging.info(jax.tree_map(lambda x: x.shape, params))
-  # logging.info(nn.tabulate(model, rng_key)(dummy_input))
 
   if FLAGS.optimizer == "adam":
     opt = optax.adam(FLAGS.learning_rate)
@@ -260,8 +258,8 @@ def main(unused_args):
       "epoch/epoch": epoch,
     }, commit=True)
 
-    # save checkpoint every checkpoint_interval epochs
-    if epoch % FLAGS.checkpoint_interval == 0:
+    # save checkpoint every checkpoint_interval epochs or last epoch
+    if epoch % FLAGS.checkpoint_interval == 0 or epoch == FLAGS.epochs:
       ckpt["step"] = epoch
       ckpt["state"] = state
       checkpoint_dir = wandb.run.dir + "/orbax_ckpt"
