@@ -28,7 +28,7 @@ nvidia-smi
 #   --learning_rate=0.00001 --seed=8 --dnn_layers=400,400,400,400,400,1 \
 #   --train_dir=/pscratch/sd/m/mingfong/transfer-learning/fullsim_train_processed/ \
 #   --wandb_project=fullsim --wandb_run_name=TESTING_DELETE_ME \
-#   --checkpoint_interval 20 \
+#   --checkpoint_interval=20 \
 #   --wandb_run_path=mingfong/fullsim/m2n32nop --resume_training=True
 
 # train fullsim
@@ -38,4 +38,5 @@ srun -n 1 -c 128 --cpu_bind=cores -G 1 --gpu-bind=single:1 python3 run.py \
   --learning_rate=0.00001 --seed=5 --dnn_layers=400,400,400,400,400,1 \
   --train_dir=/pscratch/sd/m/mingfong/transfer-learning/fullsim_train_processed/ \
   --wandb_project=fullsim --wandb_run_name=fullsim_only \
-  --checkpoint_interval=10
+  --checkpoint_interval=10 \
+  --wandb_run_path=mingfong/fullsim/25ao9xre --resume_training=True
