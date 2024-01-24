@@ -50,7 +50,7 @@ flags.DEFINE_string("wandb_run_path", None,
                     "Previous WandB run path to load checkpoint. (i.e. mingfong/fullsim/15yzruts). "
                     "If None or if resume_training is False, create a new run.")
 flags.DEFINE_bool("resume_training", False,
-                  "Whether to resume training from checkpoint. "
+                  "Whether to resume training from checkpoint. Will start the epoch count from the previous run. "
                   "If True, must specify wandb_run_path. "
                   "If False, only loads weights if wandb_run_path is specified.")
 flags.DEFINE_integer("checkpoint_interval", 1, "Checkpoint interval (in epochs).")
@@ -175,21 +175,23 @@ def main(unused_args):
   orbax_checkpointer = orbax.checkpoint.PyTreeCheckpointer()
   save_args = orbax_utils.save_args_from_target(ckpt)
   
-  if wandb.run.resumed:
+  start_step = 1
+  if FLAGS.wandb_run_path is not None:
     # restore checkpoint files from wandb previous run
-    logging.info("Restoring checkpoint from previous run")
+    logging.info("Restoring weights from previous run")
     artifact = wandb.use_artifact(
-      f"{wandb.run.id}-checkpoint:latest"
+      f"{FLAGS.wandb_run_path}-checkpoint:latest"
     )
     artifact_dir = artifact.download(wandb.run.dir + "/orbax_ckpt")
 
     # Restore the latest checkpoint
     raw_restored = orbax_checkpointer.restore(artifact_dir, item=ckpt)
-    start_step = raw_restored["step"] + 1
     state = raw_restored["state"]
+    if wandb.run.resumed:
+      logging.info("Restoring step from previous run")
+      start_step = raw_restored["step"] + 1
   else:
     logging.info("Training from scratch.")
-    start_step = 1
 
 
   # Training loop
