@@ -164,3 +164,6 @@ cython_debug/
 
 # slurm output
 *.out
+
+# temp downloaded checkpoints from wandb for plotting script
+/checkpoints
