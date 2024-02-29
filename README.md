@@ -6,5 +6,5 @@ Builds on [Constituent-Based Top-Quark Tagging with the ATLAS Detector](https://
 # Models
 DNN, GNN (ParticleNet-like, GAT)
 
-### Author
-Ming Fong, LBNL
+### Authors
+Ming Fong (LBNL), Benjamin Nachman (LBNL)
